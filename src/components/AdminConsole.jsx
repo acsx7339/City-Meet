@@ -12,7 +12,10 @@ import {
   ExternalLink,
   Shield,
   Layers,
-  Sparkles
+  Sparkles,
+  Lock,
+  KeyRound,
+  LogOut
 } from 'lucide-react';
 
 // 內建的官方熱門活動範本包
@@ -75,9 +78,58 @@ const OFFICIAL_SAMPLE_PACK = [
 ];
 
 export default function AdminConsole({ events, onUpdateEvents }) {
+  // 管理員驗證狀態管理 (預設需帳密 admin / sjwd5407 登入)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('city_meet_admin_auth') === 'true';
+  });
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [activeTab, setActiveTab] = useState('import'); // 'import' | 'list'
   const [jsonInput, setJsonInput] = useState('');
   const [importNotice, setImportNotice] = useState(null); // { type: 'success' | 'error', message: string, count?: number }
+
+  // 登入驗證處理
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsLoggingIn(true);
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        sessionStorage.setItem('city_meet_admin_auth', 'true');
+        setIsAuthenticated(true);
+      } else {
+        setLoginError(data.error || '管理員帳號或密碼錯誤');
+      }
+    } catch (err) {
+      // 離線回退支援
+      if (username.trim() === 'admin' && password === 'sjwd5407') {
+        sessionStorage.setItem('city_meet_admin_auth', 'true');
+        setIsAuthenticated(true);
+      } else {
+        setLoginError('管理員帳號或密碼錯誤，請重新確認');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // 管理員登出處理
+  const handleAdminLogout = () => {
+    sessionStorage.removeItem('city_meet_admin_auth');
+    setIsAuthenticated(false);
+    setUsername('');
+    setPassword('');
+  };
 
   // 載入官方範本
   const handleLoadSample = () => {
@@ -163,6 +215,166 @@ export default function AdminConsole({ events, onUpdateEvents }) {
     }
   };
 
+  // 若尚未通過管理員驗證，渲染高安全性認證閘道介面
+  if (!isAuthenticated) {
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-main)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}
+      >
+        <div
+          className="glass-panel"
+          style={{
+            width: '100%',
+            maxWidth: '420px',
+            padding: '36px 32px',
+            borderRadius: '20px',
+            border: '1px solid rgba(0, 240, 255, 0.35)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}
+        >
+          {/* 鎖頭圖示與標題 */}
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+                border: '1px solid var(--accent-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)'
+              }}
+            >
+              <Lock size={26} color="var(--accent-cyan)" />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
+                後台管理員身份驗證
+              </h1>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                此區域為機密活動管理控制台，請輸入管理員憑證解鎖
+              </p>
+            </div>
+          </div>
+
+          {/* 錯誤提示 */}
+          {loginError && (
+            <div
+              style={{
+                padding: '10px 14px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '10px',
+                color: '#f87171',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* 表單 */}
+          <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label className="form-label-title">
+                <span>管理員帳號</span>
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="請輸入帳號 (例如: admin)"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="form-input-field"
+                disabled={isLoggingIn}
+              />
+            </div>
+
+            <div>
+              <label className="form-label-title">
+                <span>授權密碼</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="請輸入管理密碼"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="form-input-field"
+                disabled={isLoggingIn}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(135deg, #00f0ff 0%, #3b82f6 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#090d16',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: isLoggingIn ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 0 20px rgba(0, 240, 255, 0.35)',
+                marginTop: '4px',
+                opacity: isLoggingIn ? 0.7 : 1
+              }}
+            >
+              <KeyRound size={16} />
+              <span>{isLoggingIn ? '正在驗證身分...' : '解鎖並進入管理台'}</span>
+            </button>
+          </form>
+
+          {/* 返回前台按鈕 */}
+          <div style={{ textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '14px' }}>
+            <a
+              href="/"
+              style={{
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-cyan)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <span>← 返回公開地圖首頁</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -211,25 +423,48 @@ export default function AdminConsole({ events, onUpdateEvents }) {
             </div>
           </div>
 
-          <a
-            href="/"
-            style={{
-              padding: '8px 16px',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--accent-cyan)',
-              background: 'rgba(0, 240, 255, 0.1)',
-              border: '1px solid var(--accent-cyan)',
-              borderRadius: '9999px',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <span>返回前台地圖</span>
-            <ExternalLink size={14} />
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <a
+              href="/"
+              style={{
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--accent-cyan)',
+                background: 'rgba(0, 240, 255, 0.1)',
+                border: '1px solid var(--accent-cyan)',
+                borderRadius: '9999px',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>返回前台地圖</span>
+              <ExternalLink size={14} />
+            </a>
+
+            <button
+              onClick={handleAdminLogout}
+              style={{
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#f87171',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '9999px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="登出管理員"
+            >
+              <LogOut size={14} />
+              <span>管理員登出</span>
+            </button>
+          </div>
         </div>
 
         {/* 分頁切換選單 */}

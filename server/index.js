@@ -49,6 +49,25 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// --- 後台管理員登入認證 API ---
+const ADMIN_USERNAME = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'sjwd5407';
+
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    return res.json({
+      success: true,
+      message: '認證成功',
+      token: `adm-token-${Date.now()}`
+    });
+  }
+  return res.status(401).json({
+    success: false,
+    error: '管理員帳號或密碼錯誤，請重新輸入'
+  });
+});
+
 // --- 使用者認證與 Google 登入 API ---
 
 // 取得 Google Client ID 配置
