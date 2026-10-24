@@ -71,6 +71,24 @@ export default function CycloneMap({
       map.on('move', handleMapUpdate);
       map.on('zoom', handleMapUpdate);
       map.on('resize', handleMapUpdate);
+
+      // 5. 轉發地圖滑鼠移動與點擊至 Canvas 引擎（讓地圖可以完全自由拖拉）
+      map.on('mousemove', (e) => {
+        if (engineRef.current) {
+          const pt = e.containerPoint;
+          const isHover = engineRef.current.setMousePosition(pt.x, pt.y);
+          if (mapContainerRef.current) {
+            mapContainerRef.current.style.cursor = isHover ? 'pointer' : '';
+          }
+        }
+      });
+
+      map.on('click', (e) => {
+        if (engineRef.current) {
+          const pt = e.containerPoint;
+          engineRef.current.handleCoordClick(pt.x, pt.y);
+        }
+      });
     }
 
     return () => {
@@ -134,7 +152,7 @@ export default function CycloneMap({
           width: '100%',
           height: '100%',
           zIndex: 2,
-          pointerEvents: 'auto'
+          pointerEvents: 'none'
         }}
       />
 

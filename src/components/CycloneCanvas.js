@@ -43,48 +43,57 @@ export class CycloneEngine {
     this.selectedEventId = id;
   }
 
+  setMousePosition(x, y) {
+    this.mousePos = { x, y };
+
+    let foundHover = null;
+    if (this.getScreenCoords) {
+      for (const evt of this.events) {
+        const pt = this.getScreenCoords(evt.coordinates[0], evt.coordinates[1]);
+        if (!pt) continue;
+        const levelConfig = STORM_LEVELS[evt.stormLevel] || STORM_LEVELS.mild;
+        const dx = this.mousePos.x - pt.x;
+        const dy = this.mousePos.y - pt.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= levelConfig.radius + 35) {
+          foundHover = evt.id;
+          break;
+        }
+      }
+    }
+
+    this.hoveredEventId = foundHover;
+    return !!foundHover;
+  }
+
+  handleCoordClick(x, y) {
+    let clickedId = this.hoveredEventId;
+    if (!clickedId && this.getScreenCoords) {
+      for (const evt of this.events) {
+        const pt = this.getScreenCoords(evt.coordinates[0], evt.coordinates[1]);
+        if (!pt) continue;
+        const levelConfig = STORM_LEVELS[evt.stormLevel] || STORM_LEVELS.mild;
+        const dx = x - pt.x;
+        const dy = y - pt.y;
+        if (Math.sqrt(dx * dx + dy * dy) <= levelConfig.radius + 35) {
+          clickedId = evt.id;
+          break;
+        }
+      }
+    }
+
+    if (clickedId && this.options.onSelectEvent) {
+      const target = this.events.find(ev => ev.id === clickedId);
+      if (target) {
+        this.options.onSelectEvent(target);
+        return true;
+      }
+    }
+    return false;
+  }
+
   initEvents() {
-    this.handleMouseMove = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      this.mousePos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      };
-
-      // 檢查是否 hover 到任何氣旋
-      let foundHover = null;
-      if (this.getScreenCoords) {
-        for (const evt of this.events) {
-          const pt = this.getScreenCoords(evt.coordinates[0], evt.coordinates[1]);
-          if (!pt) continue;
-          const levelConfig = STORM_LEVELS[evt.stormLevel] || STORM_LEVELS.mild;
-          const dx = this.mousePos.x - pt.x;
-          const dy = this.mousePos.y - pt.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist <= levelConfig.radius + 35) {
-            foundHover = evt.id;
-            break;
-          }
-        }
-      }
-
-      if (foundHover !== this.hoveredEventId) {
-        this.hoveredEventId = foundHover;
-        this.canvas.style.cursor = foundHover ? 'pointer' : 'default';
-      }
-    };
-
-    this.handleClick = (e) => {
-      if (this.hoveredEventId && this.options.onSelectEvent) {
-        const target = this.events.find(ev => ev.id === this.hoveredEventId);
-        if (target) {
-          this.options.onSelectEvent(target);
-        }
-      }
-    };
-
-    this.canvas.addEventListener('mousemove', this.handleMouseMove);
-    this.canvas.addEventListener('click', this.handleClick);
+    // 移除 canvas 上的攔截，統一由 Leaflet 地圖容器轉發，確保滑鼠可自由拖曳地圖
   }
 
   rebuildParticles() {
