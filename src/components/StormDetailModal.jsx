@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { STORM_LEVELS } from '../data/mockEvents';
 import SafetyBadge from './SafetyBadge';
 import { X, Navigation, Users, Send, CheckCircle2, MapPin, Sparkles, AlertCircle } from 'lucide-react';
@@ -11,10 +11,19 @@ export default function StormDetailModal({
   userStatus,
   onUpdateUserStatus
 }) {
-  if (!event) return null;
-
   const [moodText, setMoodText] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('💬');
+
+  // 監聽鍵盤 Escape 鍵自動關閉彈窗
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  if (!event) return null;
   const level = STORM_LEVELS[event.stormLevel] || STORM_LEVELS.mild;
 
   const EMOJI_OPTIONS = ['💬', '🎸', '☕', '🍜', '📸', '🔥', '✨', '🎉', '🚇'];
@@ -43,35 +52,14 @@ export default function StormDetailModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
-      }}
+      className="modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="glass-panel"
-        style={{
-          width: '100%',
-          maxWidth: '560px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid rgba(0, 240, 255, 0.3)',
-          borderRadius: '20px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '18px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)'
-        }}
+        className="modal-container glass-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="storm-detail-title"
         onClick={e => e.stopPropagation()}
       >
         {/* 頂部 Header */}
@@ -95,24 +83,14 @@ export default function StormDetailModal({
                 {event.area}・{event.timeDesc}
               </span>
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+            <h2 id="storm-detail-title" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
               {event.title}
             </h2>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              cursor: 'pointer'
-            }}
+            className="modal-close-btn"
+            aria-label="關閉彈窗"
           >
             <X size={18} />
           </button>

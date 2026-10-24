@@ -123,7 +123,7 @@ export default function CycloneMap({
         { duration: 1.2, easeLinearity: 0.25 }
       );
     }
-  }, [selectedEvent]);
+  }, [selectedEvent?.id]);
 
   // 控制項：縮放與復位
   const handleZoomIn = () => mapInstanceRef.current && mapInstanceRef.current.zoomIn();

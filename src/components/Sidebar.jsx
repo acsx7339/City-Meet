@@ -12,21 +12,24 @@ export default function Sidebar({
   onSelectCategory,
   sourceFilter,
   onSelectSource,
+  searchQuery,
+  onSearchChange,
   onOpenCreateModal
 }) {
   return (
     <aside
       className="glass-panel"
       style={{
-        width: '380px',
+        width: '35%',
         minWidth: '340px',
-        height: '100%',
+        maxWidth: '440px',
+        height: 'calc(100% - 32px)',
         display: 'flex',
         flexDirection: 'column',
         zIndex: 10,
         margin: '16px 0 16px 16px',
         padding: '20px',
-        gap: '16px',
+        gap: '14px',
         overflow: 'hidden'
       }}
     >
@@ -86,6 +89,8 @@ export default function Sidebar({
         onSelectCategory={onSelectCategory}
         sourceFilter={sourceFilter}
         onSelectSource={onSelectSource}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
       />
 
       {/* 活動風暴列表標題與計數 */}

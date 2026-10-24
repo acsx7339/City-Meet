@@ -167,7 +167,7 @@ export default function AdminConsole({ events, onUpdateEvents }) {
     <div
       style={{
         width: '100vw',
-        minHeight: '100vh',
+        height: '100vh',
         backgroundColor: 'var(--bg-primary)',
         color: 'var(--text-main)',
         padding: '32px 24px',

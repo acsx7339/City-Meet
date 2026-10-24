@@ -39,7 +39,6 @@ body {
   overflow: hidden;
   height: 100vh;
   width: 100vw;
-  user-select: none;
 }
 
 h1, h2, h3, h4, .font-heading {
@@ -117,17 +116,119 @@ h1, h2, h3, h4, .font-heading {
   background: rgba(148, 163, 184, 0.4);
 }
 
-/* Leaflet Container Overrides */
+/* Leaflet Container Overrides & ODbL 合法標示 */
 .leaflet-container {
   background: #090d16 !important;
   font-family: inherit;
 }
 .leaflet-control-attribution {
-  display: none !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  color: var(--text-dim) !important;
+  font-size: 10px !important;
+  border-radius: 6px;
+  padding: 2px 8px !important;
+  margin: 6px !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.leaflet-control-attribution a {
+  color: var(--text-muted) !important;
+  text-decoration: none;
+}
+.leaflet-control-attribution a:hover {
+  color: var(--accent-cyan) !important;
+  text-decoration: underline;
 }
 
 /* 官方免費 OpenStreetMap 暗黑濾鏡（徹底去除 API KEY REQUIRED 水印，零金鑰） */
 .leaflet-tile-pane {
   filter: invert(100%) hue-rotate(180deg) brightness(78%) contrast(95%) grayscale(20%);
 }
+
+/* Modal & Form Utility Classes */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-container {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+.form-input-field {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.form-input-field:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.form-label-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+
 

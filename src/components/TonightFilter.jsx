@@ -1,6 +1,6 @@
 import React from 'react';
 import { CATEGORIES } from '../data/mockEvents';
-import { Sparkles, ShieldCheck, Flame, Compass } from 'lucide-react';
+import { Sparkles, ShieldCheck, Flame, Compass, Search } from 'lucide-react';
 
 export default function TonightFilter({
   activeCategory,
@@ -11,7 +11,29 @@ export default function TonightFilter({
   onSearchChange
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* 搜尋關鍵字輸入框 */}
+      {onSearchChange && (
+        <div style={{ position: 'relative', width: '100%' }}>
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            value={searchQuery || ''}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="搜尋氣旋、商圈 (如: 台北101、赤峰街)..."
+            style={{
+              width: '100%',
+              padding: '7px 12px 7px 30px',
+              borderRadius: '9999px',
+              border: '1px solid var(--border-subtle)',
+              background: 'rgba(15, 23, 42, 0.65)',
+              color: '#fff',
+              fontSize: '12px',
+              outline: 'none'
+            }}
+          />
+        </div>
+      )}
       {/* 雙軌來源快速切換 (今晚去哪裡模式) */}
       <div
         style={{

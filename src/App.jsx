@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SEED_EVENTS } from './data/mockEvents';
+import { mapScoreToStormLevel } from './utils/stormCalculator';
 import CycloneMap from './components/CycloneMap';
 import Sidebar from './components/Sidebar';
 import BottomSheet from './components/BottomSheet';
 import StormDetailModal from './components/StormDetailModal';
 import CreateStormModal from './components/CreateStormModal';
 import AdminConsole from './components/AdminConsole';
-import { Wind, Plus, Compass } from 'lucide-react';
+import TonightFilter from './components/TonightFilter';
+import { Wind, Plus, Compass, Search } from 'lucide-react';
 
 export default function App() {
   const [events, setEvents] = useState(() => {
-    // 優先讀取 LocalStorage 快取
-    const saved = localStorage.getItem('city_meet_events');
+    // 快取版本控制 (city_meet_events_v2)
+    const saved = localStorage.getItem('city_meet_events_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { }
     }
@@ -44,10 +46,12 @@ export default function App() {
     };
   }, []);
 
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  // 單一真實數據源：只記錄選中的 ID，其餘物件內容衍生自 events
+  const [selectedEventId, setSelectedEventId] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all'); // 'all' | 'official' | 'ugc'
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMobileFilter, setShowMobileFilter] = useState(false);
   const [userStatuses, setUserStatuses] = useState({}); // eventId -> statusKey
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -62,13 +66,13 @@ export default function App() {
 
   // 持久化儲存活動
   useEffect(() => {
-    localStorage.setItem('city_meet_events', JSON.stringify(events));
+    localStorage.setItem('city_meet_events_v2', JSON.stringify(events));
   }, [events]);
 
-  // 若為後台網址，直接渲染管理員控制台（前台不顯示任何入口連結）
-  if (isAdminRoute) {
-    return <AdminConsole events={events} onUpdateEvents={setEvents} />;
-  }
+  // 單一數據源：衍生當前選中的活動物件
+  const selectedEvent = useMemo(() => {
+    return events.find(e => e.id === selectedEventId) || null;
+  }, [events, selectedEventId]);
 
   // 過濾活動清單
   const filteredEvents = useMemo(() => {
@@ -95,50 +99,36 @@ export default function App() {
 
   // 選中事件處理
   const handleSelectEvent = (event) => {
-    setSelectedEvent(event);
+    setSelectedEventId(event.id);
     if (!isMobile) {
       // 桌面端點擊直接開詳情視窗
       setShowDetailModal(true);
     }
   };
 
-  // 新增現場小心聲
+  // 新增現場小心聲（熱度提升並動態計算風暴等級升級）
   const handleAddMood = (eventId, text, emoji) => {
+    const newMood = {
+      id: `m-${Date.now()}`,
+      text,
+      emoji: emoji || '💬',
+      author: '現場同好'
+    };
+
     setEvents(prev =>
       prev.map(evt => {
         if (evt.id === eventId) {
-          const newMood = {
-            id: `m-${Date.now()}`,
-            text,
-            emoji: emoji || '💬',
-            author: '現場同好'
-          };
-          // 每次發布心聲，熱度分 +15
+          const newScore = evt.heatScore + 15;
           return {
             ...evt,
-            heatScore: evt.heatScore + 15,
+            heatScore: newScore,
+            stormLevel: mapScoreToStormLevel(newScore),
             moodParticles: [newMood, ...(evt.moodParticles || [])]
           };
         }
         return evt;
       })
     );
-
-    // 同步更新當前選中活動
-    setSelectedEvent(prev => {
-      if (!prev || prev.id !== eventId) return prev;
-      const newMood = {
-        id: `m-${Date.now()}`,
-        text,
-        emoji: emoji || '💬',
-        author: '現場同好'
-      };
-      return {
-        ...prev,
-        heatScore: prev.heatScore + 15,
-        moodParticles: [newMood, ...(prev.moodParticles || [])]
-      };
-    });
   };
 
   // 更新使用者的抵達狀態 (我出發了 / 快到了 / 已抵達)
@@ -150,8 +140,12 @@ export default function App() {
         if (evt.id === eventId) {
           const stats = { ...evt.arrivalStats };
           stats[statusKey] = (stats[statusKey] || 0) + 1;
+          const arrivalBonus = statusKey === 'arrived' ? 5 : 2;
+          const newScore = evt.heatScore + arrivalBonus;
           return {
             ...evt,
+            heatScore: newScore,
+            stormLevel: mapScoreToStormLevel(newScore),
             arrivalStats: stats,
             participantsCount: evt.participantsCount + 1
           };
@@ -159,24 +153,18 @@ export default function App() {
         return evt;
       })
     );
-
-    setSelectedEvent(prev => {
-      if (!prev || prev.id !== eventId) return prev;
-      const stats = { ...prev.arrivalStats };
-      stats[statusKey] = (stats[statusKey] || 0) + 1;
-      return {
-        ...prev,
-        arrivalStats: stats,
-        participantsCount: prev.participantsCount + 1
-      };
-    });
   };
 
   // 全民自主造局：建立新氣旋
   const handleCreateStorm = (newStorm) => {
     setEvents(prev => [newStorm, ...prev]);
-    setSelectedEvent(newStorm);
+    setSelectedEventId(newStorm.id);
   };
+
+  // 若為後台網址，在所有 Hook 調用完畢後再渲染（嚴格遵守 React Hook 規範）
+  if (isAdminRoute) {
+    return <AdminConsole events={events} onUpdateEvents={setEvents} />;
+  }
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex' }}>
@@ -190,11 +178,13 @@ export default function App() {
           onSelectCategory={setActiveCategory}
           sourceFilter={sourceFilter}
           onSelectSource={setSourceFilter}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           onOpenCreateModal={() => setShowCreateModal(true)}
         />
       )}
 
-      {/* 行動端 (<768px)：頂部精簡浮動導航條 */}
+      {/* 行動端 (<768px)：頂部精簡浮動導航條與篩選抽屜 */}
       {isMobile && (
         <div
           style={{
@@ -235,26 +225,72 @@ export default function App() {
               <span style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>City-Meet</span>
             </div>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="glass-pill"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setShowMobileFilter(prev => !prev)}
+                className="glass-pill"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  background: showMobileFilter ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                  border: showMobileFilter ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                aria-label="搜尋與篩選"
+              >
+                <Search size={13} />
+                <span>篩選</span>
+              </button>
+
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="glass-pill"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  background: 'rgba(0, 240, 255, 0.2)',
+                  border: '1px solid var(--accent-cyan)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Plus size={13} />
+                <span>造局</span>
+              </button>
+            </div>
+          </div>
+
+          {showMobileFilter && (
+            <div
+              className="glass-panel"
               style={{
-                padding: '6px 12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                background: 'rgba(0, 240, 255, 0.2)',
-                border: '1px solid var(--accent-cyan)',
-                color: '#fff',
-                cursor: 'pointer',
+                padding: '12px',
+                borderRadius: '14px',
                 display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
+                flexDirection: 'column',
+                gap: '8px',
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)'
               }}
             >
-              <Plus size={13} />
-              <span>造局</span>
-            </button>
-          </div>
+              <TonightFilter
+                activeCategory={activeCategory}
+                onSelectCategory={setActiveCategory}
+                sourceFilter={sourceFilter}
+                onSelectSource={setSourceFilter}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -272,7 +308,7 @@ export default function App() {
       {isMobile && selectedEvent && !showDetailModal && (
         <BottomSheet
           event={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
+          onClose={() => setSelectedEventId(null)}
           onOpenDetail={() => setShowDetailModal(true)}
         />
       )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CATEGORIES } from '../data/mockEvents';
 import { X, Wind, Sparkles, Navigation, MapPin } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -11,6 +11,15 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
   const [assemblyDetail, setAssemblyDetail] = useState('');
   const [initialMood, setInitialMood] = useState('');
   const [initialEmoji, setInitialEmoji] = useState('✨');
+
+  // 監聽鍵盤 Escape 鍵自動關閉彈窗
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const EMOJI_OPTIONS = ['✨', '🍜', '☕', '🎸', '📷', '🏃', '🎉', '💬'];
 
@@ -69,35 +78,14 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 210,
-        background: 'rgba(0, 0, 0, 0.78)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
-      }}
+      className="modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="glass-panel"
-        style={{
-          width: '100%',
-          maxWidth: '520px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          background: 'rgba(15, 23, 42, 0.96)',
-          border: '1px solid rgba(0, 240, 255, 0.4)',
-          borderRadius: '20px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          boxShadow: '0 20px 60px rgba(0, 240, 255, 0.2)'
-        }}
+        className="modal-container glass-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-storm-title"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -118,7 +106,7 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
               <Wind size={18} />
             </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
+              <h2 id="create-storm-title" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
                 全民自主造局・發起新氣旋
               </h2>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -128,18 +116,8 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              cursor: 'pointer'
-            }}
+            className="modal-close-btn"
+            aria-label="關閉彈窗"
           >
             <X size={16} />
           </button>
@@ -148,8 +126,8 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
         {/* 表單 */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              活動氣旋名稱 *
+            <label className="form-label-title">
+              <span>活動氣旋名稱 *</span>
             </label>
             <input
               type="text"
@@ -157,37 +135,19 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="例如：華山草地吹風聊天小局、通化夜市吃冰打卡"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#fff',
-                fontSize: '13px',
-                outline: 'none'
-              }}
+              className="form-input-field"
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                活動分類
+              <label className="form-label-title">
+                <span>活動分類</span>
               </label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(30, 41, 59, 0.9)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
+                className="form-input-field"
               >
                 {CATEGORIES.filter(c => c.id !== 'all').map(c => (
                   <option key={c.id} value={c.id}>
@@ -198,31 +158,22 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                出沒商圈區域
+              <label className="form-label-title">
+                <span>出沒商圈區域</span>
               </label>
               <input
                 type="text"
                 value={area}
                 onChange={e => setArea(e.target.value)}
                 placeholder="例如：大安區、中山站"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
+                className="form-input-field"
               />
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              暴風眼核心集合點 *
+            <label className="form-label-title">
+              <span>暴風眼核心集合點 *</span>
             </label>
             <input
               type="text"
@@ -230,44 +181,26 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
               value={assemblyName}
               onChange={e => setAssemblyName(e.target.value)}
               placeholder="例如：捷運忠孝敦化 2 號出口旁長椅"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#fff',
-                fontSize: '13px',
-                outline: 'none'
-              }}
+              className="form-input-field"
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              集合點地標與外觀備註
+            <label className="form-label-title">
+              <span>集合點地標與外觀備註</span>
             </label>
             <input
               type="text"
               value={assemblyDetail}
               onChange={e => setAssemblyDetail(e.target.value)}
               placeholder="例如：我穿白色帽T、拿藍色保溫瓶"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#fff',
-                fontSize: '13px',
-                outline: 'none'
-              }}
+              className="form-input-field"
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              第一顆現場小心聲（跟隨氣旋旋轉）
+            <label className="form-label-title">
+              <span>第一顆現場小心聲（跟隨氣旋旋轉）</span>
             </label>
             <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
               {EMOJI_OPTIONS.map(em => (
@@ -293,16 +226,7 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
               value={initialMood}
               onChange={e => setInitialMood(e.target.value)}
               placeholder="例如：剛坐下等大家，微風好舒服！"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#fff',
-                fontSize: '13px',
-                outline: 'none'
-              }}
+              className="form-input-field"
             />
           </div>
 

@@ -20,6 +20,7 @@ export class CycloneEngine {
     };
 
     this.particles = new Map(); // eventId -> Array of mood & wind particles
+    this.glowFadeCache = new Map(); // glow -> fade string cache for 60fps render loop
     this.hoveredEventId = null;
     this.selectedEventId = null;
     this.mousePos = { x: -1000, y: -1000 };
@@ -97,48 +98,69 @@ export class CycloneEngine {
   }
 
   rebuildParticles() {
-    this.particles.clear();
     const isMobile = this.options.isMobile;
+    const nextParticles = new Map();
 
     this.events.forEach(evt => {
       const level = STORM_LEVELS[evt.stormLevel] || STORM_LEVELS.mild;
       const moodList = evt.moodParticles || [];
+      const prevItems = this.particles.get(evt.id) || [];
       const items = [];
 
-      // 1. 生成風場氣旋粒子 (Wind spiral particles)
+      // 1. 風場粒子：沿用現有粒子角度，平滑旋轉不瞬移
       const maxWind = isMobile ? Math.floor(level.particleCount * 0.6) : level.particleCount;
+      const existingWind = prevItems.filter(p => p.type === 'wind');
+
       for (let i = 0; i < maxWind; i++) {
-        items.push({
-          type: 'wind',
-          r: 12 + Math.random() * (level.radius - 8),
-          theta: Math.random() * Math.PI * 2,
-          speedOffset: 0.8 + Math.random() * 0.4,
-          size: 1.5 + Math.random() * 2,
-          alpha: 0.25 + Math.random() * 0.4
-        });
+        if (existingWind[i]) {
+          existingWind[i].r = Math.min(existingWind[i].r, level.radius);
+          items.push(existingWind[i]);
+        } else {
+          items.push({
+            type: 'wind',
+            r: 12 + Math.random() * (level.radius - 8),
+            theta: Math.random() * Math.PI * 2,
+            speedOffset: 0.8 + Math.random() * 0.4,
+            size: 1.5 + Math.random() * 2,
+            alpha: 0.25 + Math.random() * 0.4
+          });
+        }
       }
 
-      // 2. 生成圍繞風暴旋轉的「小心聲氣泡」 (Mood Particles)
+      // 2. 心聲粒子：若已存在相同 ID 則完全保留原有旋轉角速度與位置，絕不跳動！
+      const existingMoodMap = new Map();
+      prevItems.filter(p => p.type === 'mood').forEach(m => existingMoodMap.set(m.id, m));
+
       const count = moodList.length;
       moodList.forEach((mood, idx) => {
-        // 在不同同心圓軌道上交錯分佈
-        const orbitRadius = level.radius * (0.45 + (idx % 3) * 0.28);
-        const baseAngle = (idx / count) * Math.PI * 2;
-        items.push({
-          type: 'mood',
-          id: mood.id,
-          text: mood.text,
-          emoji: mood.emoji || '💬',
-          author: mood.author,
-          r: orbitRadius,
-          theta: baseAngle,
-          speedOffset: 0.95 + (idx % 2) * 0.1,
-          scale: 1
-        });
+        const existing = existingMoodMap.get(mood.id);
+        if (existing) {
+          existing.text = mood.text;
+          existing.emoji = mood.emoji || '💬';
+          existing.author = mood.author;
+          existing.r = Math.min(existing.r, level.radius * 0.9);
+          items.push(existing);
+        } else {
+          const orbitRadius = level.radius * (0.45 + (idx % 3) * 0.28);
+          const baseAngle = (idx / count) * Math.PI * 2;
+          items.push({
+            type: 'mood',
+            id: mood.id,
+            text: mood.text,
+            emoji: mood.emoji || '💬',
+            author: mood.author,
+            r: orbitRadius,
+            theta: baseAngle,
+            speedOffset: 0.95 + (idx % 2) * 0.1,
+            scale: 1
+          });
+        }
       });
 
-      this.particles.set(evt.id, items);
+      nextParticles.set(evt.id, items);
     });
+
+    this.particles = nextParticles;
   }
 
   addMoodParticle(eventId, moodItem) {
@@ -202,8 +224,6 @@ export class CycloneEngine {
 
   destroy() {
     this.stop();
-    this.canvas.removeEventListener('mousemove', this.handleMouseMove);
-    this.canvas.removeEventListener('click', this.handleClick);
   }
 
   render() {
@@ -240,16 +260,23 @@ export class CycloneEngine {
     });
   }
 
+  getGlowFade(glow) {
+    if (!this.glowFadeCache.has(glow)) {
+      this.glowFadeCache.set(glow, glow.replace(/[\d\.]+\)$/, '0.15)'));
+    }
+    return this.glowFadeCache.get(glow);
+  }
+
   drawStormCenter(ctx, center, evt, level, isHovered, isSelected) {
     const { x, y } = center;
     const color = level.color;
 
     ctx.save();
 
-    // 1. 旋轉氣旋外環氣場光暈 (Outer Atmosphere Glow)
+    // 1. 旋轉氣旋外環氣場光暈 (Outer Atmosphere Glow - 使用記憶快取優化 60fps 繪製)
     const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, level.radius);
     glowGrad.addColorStop(0, level.glow);
-    glowGrad.addColorStop(0.6, level.glow.replace(/[\d\.]+\)$/, '0.15)'));
+    glowGrad.addColorStop(0.6, this.getGlowFade(level.glow));
     glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
 
     ctx.fillStyle = glowGrad;
