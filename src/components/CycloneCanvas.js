@@ -6,6 +6,7 @@
  */
 
 import { STORM_LEVELS } from '../data/mockEvents';
+import { calculatePolarPosition } from '../utils/stormCalculator';
 
 export class CycloneEngine {
   constructor(canvas, options = {}) {
@@ -304,9 +305,14 @@ export class CycloneEngine {
 
     items.forEach(p => {
       // 極座標旋轉步進演算法: X = X_c + r * cos(theta + omega * t)
-      const currentAngle = p.theta + level.speed * p.speedOffset * this.time;
-      const px = x + p.r * Math.cos(currentAngle);
-      const py = y + p.r * Math.sin(currentAngle);
+      const { x: px, y: py } = calculatePolarPosition({
+        centerX: x,
+        centerY: y,
+        radius: p.r,
+        theta: p.theta,
+        speed: level.speed * p.speedOffset,
+        time: this.time
+      });
 
       if (p.type === 'wind') {
         // 風場光點
