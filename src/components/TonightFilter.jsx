@@ -10,7 +10,8 @@ export default function TonightFilter({
   onSelectSource,
   searchQuery,
   onSearchChange,
-  onSelectLocation
+  onSelectLocation,
+  searchedLocation
 }) {
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -57,6 +58,9 @@ export default function TonightFilter({
   // 選擇地址或地標
   const handlePickLocation = (loc) => {
     setShowDropdown(false);
+    if (onSearchChange) {
+      onSearchChange(loc.name);
+    }
     if (onSelectLocation) {
       onSelectLocation(loc);
     }
@@ -72,6 +76,12 @@ export default function TonightFilter({
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
     }
+  };
+
+  const handleClearSearch = () => {
+    if (onSearchChange) onSearchChange('');
+    if (onSelectLocation) onSelectLocation(null);
+    setShowDropdown(false);
   };
 
   return (
@@ -90,32 +100,36 @@ export default function TonightFilter({
           <input
             type="text"
             value={searchQuery || ''}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(e) => {
+              onSearchChange(e.target.value);
+              if (searchedLocation && e.target.value !== searchedLocation.name) {
+                // 若使用者開始打新字，解除先前已鎖定的地址
+                if (onSelectLocation) onSelectLocation(null);
+              }
+            }}
             onFocus={() => {
               if (addressSuggestions.length > 0) setShowDropdown(true);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="搜尋活動、商圈或地址 (如: 台北101、忠孝東路)..."
+            placeholder="搜尋活動、商圈或地址 (如: 師大、台北101)..."
             style={{
               width: '100%',
               padding: '8px 30px 8px 30px',
               borderRadius: '9999px',
-              border: '1px solid var(--border-subtle)',
+              border: searchedLocation ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
               background: 'rgba(15, 23, 42, 0.75)',
               color: '#fff',
               fontSize: '12px',
               outline: 'none',
-              transition: 'border-color 0.2s',
-              boxSizing: 'border-box'
+              transition: 'all 0.2s',
+              boxSizing: 'border-box',
+              boxShadow: searchedLocation ? '0 0 10px rgba(0, 240, 255, 0.2)' : 'none'
             }}
           />
 
-          {searchQuery && (
+          {(searchQuery || searchedLocation) && (
             <button
-              onClick={() => {
-                onSearchChange('');
-                setShowDropdown(false);
-              }}
+              onClick={handleClearSearch}
               style={{
                 position: 'absolute',
                 right: '10px',
@@ -197,6 +211,51 @@ export default function TonightFilter({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 若已選定特定地址或地標，顯示定位資訊卡片與快速解除按鈕 */}
+      {searchedLocation && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '7px 12px',
+            borderRadius: '10px',
+            background: 'rgba(0, 240, 255, 0.1)',
+            border: '1px solid rgba(0, 240, 255, 0.3)',
+            fontSize: '11px',
+            color: 'var(--accent-cyan)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+            <MapPin size={13} style={{ flexShrink: 0 }} />
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              已鎖定：<strong>{searchedLocation.name}</strong>（方圓 2.5km）
+            </span>
+          </div>
+          <button
+            onClick={handleClearSearch}
+            style={{
+              background: 'rgba(0, 240, 255, 0.15)',
+              border: 'none',
+              borderRadius: '6px',
+              color: 'var(--accent-cyan)',
+              cursor: 'pointer',
+              fontSize: '11px',
+              padding: '2px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
+              marginLeft: '6px',
+              flexShrink: 0
+            }}
+            title="解除地點鎖定"
+          >
+            <X size={11} />
+            <span>解除</span>
+          </button>
         </div>
       )}
 

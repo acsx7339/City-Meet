@@ -16,7 +16,7 @@ import CreateStormModal from './components/CreateStormModal';
 import AdminConsole from './components/AdminConsole';
 import TonightFilter from './components/TonightFilter';
 import LoginModal from './components/LoginModal';
-import { calculateDistance } from './utils/geocoding';
+import { calculateDistance, SEARCH_RADIUS_KM } from './utils/geocoding';
 import { Wind, Plus, Compass, Search, LogIn } from 'lucide-react';
 
 export default function App() {
@@ -80,11 +80,11 @@ export default function App() {
       setSearchedLocation(null);
       return;
     }
-    // 計算該地點周邊 2.5 公里內的氣旋活動數量
+    // 計算該地點周邊半徑內的氣旋活動數量
     const nearby = events.filter(evt => {
       if (!evt.coordinates || evt.coordinates.length < 2) return false;
       const dist = calculateDistance(loc.lat, loc.lng, evt.coordinates[0], evt.coordinates[1]);
-      return dist <= 2.5;
+      return dist <= SEARCH_RADIUS_KM;
     });
     setSearchedLocation({ ...loc, nearbyCount: nearby.length });
   };
@@ -120,9 +120,9 @@ export default function App() {
     return events.find(e => e.id === selectedEventId) || null;
   }, [events, selectedEventId]);
 
-  // 過濾活動清單
+  // 過濾活動清單：若鎖定特定地址/地標，與地圖完全同步顯示周邊氣旋；否則依關鍵字搜尋
   const filteredEvents = useMemo(() => {
-    return events.filter(evt => {
+    let list = events.filter(evt => {
       // 1. 雙軌來源過濾
       if (sourceFilter !== 'all' && evt.sourceType !== sourceFilter) {
         return false;
@@ -131,17 +131,36 @@ export default function App() {
       if (activeCategory !== 'all' && evt.category !== activeCategory) {
         return false;
       }
-      // 3. 搜尋關鍵字
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          evt.title.toLowerCase().includes(q) ||
-          evt.area.toLowerCase().includes(q)
-        );
-      }
       return true;
     });
-  }, [events, sourceFilter, activeCategory, searchQuery]);
+
+    // 3. 若有定位地址/地標（使用者點選了地址/地標建議）
+    // 左側清單與地圖無縫聯動：列出方圓預設半徑內的氣旋，並由近至遠排序！
+    if (searchedLocation && searchedLocation.lat && searchedLocation.lng) {
+      const nearbyList = list
+        .map(evt => {
+          const dist = (evt.coordinates && evt.coordinates.length >= 2)
+            ? calculateDistance(searchedLocation.lat, searchedLocation.lng, evt.coordinates[0], evt.coordinates[1])
+            : 999;
+          return { ...evt, distanceToSearch: dist };
+        })
+        .filter(evt => evt.distanceToSearch <= SEARCH_RADIUS_KM)
+        .sort((a, b) => a.distanceToSearch - b.distanceToSearch);
+
+      return nearbyList;
+    }
+
+    // 4. 一般關鍵字文字搜尋（若尚未點選地址定位）
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(evt =>
+        evt.title.toLowerCase().includes(q) ||
+        evt.area.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [events, sourceFilter, activeCategory, searchQuery, searchedLocation]);
 
   // 選中事件處理
   const handleSelectEvent = (event) => {
@@ -252,6 +271,7 @@ export default function App() {
           onOpenLoginModal={() => setShowLoginModal(true)}
           onLogout={handleLogout}
           onSelectLocation={handleSelectLocation}
+          searchedLocation={searchedLocation}
         />
       )}
 
@@ -393,6 +413,7 @@ export default function App() {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onSelectLocation={handleSelectLocation}
+                searchedLocation={searchedLocation}
               />
             </div>
           )}

@@ -7,6 +7,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { CycloneEngine } from './CycloneCanvas';
+import { SEARCH_RADIUS_KM } from '../utils/geocoding';
 import { Compass, Plus, Minus, Navigation } from 'lucide-react';
 
 export default function CycloneMap({
@@ -169,7 +170,7 @@ export default function CycloneMap({
           ${displayName || ''}
         </div>
         <div style="font-size: 11px; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 3px 6px; border-radius: 4px; display: inline-block;">
-          🌪️ 方圓 2 公里內有 ${nearbyCount !== undefined ? nearbyCount : 0} 個社交氣旋
+          🌪️ 方圓 ${SEARCH_RADIUS_KM} 公里內有 ${nearbyCount !== undefined ? nearbyCount : 0} 個社交氣旋
         </div>
       </div>
     `).openPopup();

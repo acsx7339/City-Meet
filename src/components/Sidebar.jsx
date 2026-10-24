@@ -18,7 +18,8 @@ export default function Sidebar({
   currentUser,
   onOpenLoginModal,
   onLogout,
-  onSelectLocation
+  onSelectLocation,
+  searchedLocation
 }) {
   return (
     <aside
@@ -144,16 +145,24 @@ export default function Sidebar({
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
         onSelectLocation={onSelectLocation}
+        searchedLocation={searchedLocation}
       />
 
       {/* 活動風暴列表標題與計數 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          當前熱門氣旋 ({events.length})
+        <span style={{ fontSize: '12px', fontWeight: 600, color: searchedLocation ? 'var(--accent-cyan)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {searchedLocation ? (
+            <>
+              <MapPin size={13} color="var(--accent-cyan)" />
+              <span>{searchedLocation.name} 周邊氣旋 ({events.length})</span>
+            </>
+          ) : (
+            <span>當前熱門氣旋 ({events.length})</span>
+          )}
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Activity size={12} color="var(--accent-cyan)" />
-          <span>動態能量更新中</span>
+          <span>{searchedLocation ? '方圓 2.5km' : '動態能量更新中'}</span>
         </span>
       </div>
 
@@ -170,8 +179,30 @@ export default function Sidebar({
       >
         {events.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 10px', color: 'var(--text-dim)', fontSize: '13px' }}>
-            🌪️ 當前篩選條件無活動氣旋<br />
-            點擊右上角「自主造局」發起第一個小風暴！
+            {searchedLocation ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <div>📍 在「{searchedLocation.name}」方圓 2.5 公里內暫無活動氣旋</div>
+                <button
+                  onClick={() => onSelectLocation && onSelectLocation(null)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 240, 255, 0.15)',
+                    border: '1px solid var(--accent-cyan)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  清除地點鎖定，查看全城氣旋
+                </button>
+              </div>
+            ) : (
+              <>
+                🌪️ 當前篩選條件無活動氣旋<br />
+                點擊右上角「自主造局」發起第一個小風暴！
+              </>
+            )}
           </div>
         ) : (
           events.map(evt => {
@@ -231,11 +262,26 @@ export default function Sidebar({
                   <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#fff', marginBottom: '3px', lineHeight: 1.3 }}>
                     {evt.title}
                   </h3>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <MapPin size={12} color="var(--accent-cyan)" />
                       {evt.area}
                     </span>
+                    {evt.distanceToSearch !== undefined && (
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        color: 'var(--accent-cyan)',
+                        fontWeight: 600,
+                        background: 'rgba(0, 240, 255, 0.12)',
+                        border: '1px solid rgba(0, 240, 255, 0.25)',
+                        padding: '1px 6px',
+                        borderRadius: '4px'
+                      }}>
+                        📍 距此 {evt.distanceToSearch.toFixed(1)} km
+                      </span>
+                    )}
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Users size={12} />
                       {evt.participantsCount} 人參與

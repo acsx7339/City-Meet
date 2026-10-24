@@ -40,4 +40,19 @@ describe('Geocoding & Distance Utilities', () => {
     expect(parsed[0].lng).toBeCloseTo(121.51704, 4);
     expect(parsed[0].shortName).toBe('台北車站');
   });
+
+  it('correctly calculates nearby events for 師大 (Shida)', () => {
+    // 師大夜市商圈 [25.0250, 121.5280]
+    // 大安森林公園 [25.0300, 121.5350] 應在 1.5 公里內
+    const distToDaan = calculateDistance(25.0250, 121.5280, 25.0300, 121.5350);
+    expect(distToDaan).toBeLessThan(1.5);
+
+    // 西門町 [25.0425, 121.5075] 應在 3.0 公里內 (約 2.84 km)
+    const distToXimen = calculateDistance(25.0250, 121.5280, 25.0425, 121.5075);
+    expect(distToXimen).toBeLessThan(3.0);
+
+    // 板橋新北市民廣場 [25.0135, 121.4655] 遠於 5 公里
+    const distToBanqiao = calculateDistance(25.0250, 121.5280, 25.0135, 121.4655);
+    expect(distToBanqiao).toBeGreaterThan(5.0);
+  });
 });

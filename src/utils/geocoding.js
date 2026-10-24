@@ -3,6 +3,9 @@
  * 結合本地高速地標快取與 OpenStreetMap 官方 Nominatim 服務
  */
 
+// 周邊氣旋搜尋預設半徑 (公里)
+export const SEARCH_RADIUS_KM = 2.5;
+
 // 1. 半正矢公式 (Haversine Formula) 計算兩經緯度間距離 (公里)
 export function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // 地球半徑 (km)
