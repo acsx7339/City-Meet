@@ -15,7 +15,8 @@ import StormDetailModal from './components/StormDetailModal';
 import CreateStormModal from './components/CreateStormModal';
 import AdminConsole from './components/AdminConsole';
 import TonightFilter from './components/TonightFilter';
-import { Wind, Plus, Compass, Search } from 'lucide-react';
+import LoginModal from './components/LoginModal';
+import { Wind, Plus, Compass, Search, LogIn } from 'lucide-react';
 
 export default function App() {
   const [events, setEvents] = useState(() => {
@@ -62,7 +63,20 @@ export default function App() {
   const [userStatuses, setUserStatuses] = useState({}); // eventId -> statusKey
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('city_meet_user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return null;
+  });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  const handleLogout = () => {
+    localStorage.removeItem('city_meet_user');
+    setCurrentUser(null);
+  };
 
   // 監聽螢幕 RWD 斷點
   useEffect(() => {
@@ -124,11 +138,12 @@ export default function App() {
 
   // 新增現場小心聲（熱度提升、動態升級風暴半徑並同步至 PostgreSQL）
   const handleAddMood = (eventId, text, emoji) => {
+    const authorName = currentUser ? currentUser.name : '現場同好';
     const newMood = {
       id: `m-${Date.now()}`,
       text,
       emoji: emoji || '💬',
-      author: '現場同好'
+      author: authorName
     };
 
     setEvents(prev =>
@@ -147,7 +162,7 @@ export default function App() {
     );
 
     // 同步寫入 PostgreSQL
-    addMood(eventId, text, emoji);
+    addMood(eventId, text, emoji, authorName);
   };
 
   // 更新使用者的抵達狀態 (我出發了 / 快到了 / 已抵達，同步至 PostgreSQL)
@@ -179,6 +194,13 @@ export default function App() {
 
   // 全民自主造局：建立新氣旋（同步儲存至 PostgreSQL）
   const handleCreateStorm = (newStorm) => {
+    if (currentUser) {
+      newStorm.safetyTrust = {
+        ...newStorm.safetyTrust,
+        hostName: `${currentUser.name} (認證主辦)`,
+        flags: ['Google 實名認證', '初發起氣旋種子']
+      };
+    }
     setEvents(prev => [newStorm, ...prev]);
     setSelectedEventId(newStorm.id);
     createEvent(newStorm);
@@ -210,6 +232,9 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenCreateModal={() => setShowCreateModal(true)}
+          currentUser={currentUser}
+          onOpenLoginModal={() => setShowLoginModal(true)}
+          onLogout={handleLogout}
         />
       )}
 
@@ -255,6 +280,39 @@ export default function App() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {currentUser ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    style={{ width: '26px', height: '26px', borderRadius: '50%', border: '1.5px solid var(--accent-cyan)', objectFit: 'cover' }}
+                    onClick={handleLogout}
+                    title="點擊登出"
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="glass-pill"
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  aria-label="登入"
+                >
+                  <LogIn size={12} />
+                  <span>登入</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setShowMobileFilter(prev => !prev)}
                 className="glass-pill"
@@ -358,6 +416,14 @@ export default function App() {
         <CreateStormModal
           onClose={() => setShowCreateModal(false)}
           onCreateStorm={handleCreateStorm}
+        />
+      )}
+
+      {/* Google 會員登入彈窗 */}
+      {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={(u) => setCurrentUser(u)}
         />
       )}
     </div>

@@ -49,6 +49,80 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// --- 使用者認證與 Google 登入 API ---
+
+// 取得 Google Client ID 配置
+app.get('/api/auth/config', (req, res) => {
+  res.json({
+    googleClientId: process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || ''
+  });
+});
+
+// Google 登入驗證與會員存檔至 PostgreSQL
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { credential, email, name, avatar, googleId } = req.body;
+    let userEmail = email;
+    let userName = name;
+    let userAvatar = avatar;
+    let userGoogleId = googleId;
+
+    // 若傳入 Google 官方核發之 credential (JWT ID Token)，進行 Base64 解碼取得 profile
+    if (credential) {
+      try {
+        const payloadBase64 = credential.split('.')[1];
+        const decodedJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+        const payload = JSON.parse(decodedJson);
+        userEmail = payload.email || userEmail;
+        userName = payload.name || userName;
+        userAvatar = payload.picture || userAvatar;
+        userGoogleId = payload.sub || userGoogleId;
+      } catch (decodeErr) {
+        console.warn('Failed to parse Google JWT payload:', decodeErr.message);
+      }
+    }
+
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Email is required for authentication' });
+    }
+
+    const userId = `usr-${userGoogleId || Date.now()}`;
+    const sql = `
+      INSERT INTO users (id, email, name, avatar, provider, google_id)
+      VALUES ($1, $2, $3, $4, 'google', $5)
+      ON CONFLICT (email) DO UPDATE SET
+        name = EXCLUDED.name,
+        avatar = EXCLUDED.avatar,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *;
+    `;
+
+    const result = await query(sql, [
+      userId,
+      userEmail,
+      userName || userEmail.split('@')[0],
+      userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userEmail}`,
+      userGoogleId || null
+    ]);
+
+    const userRow = result.rows[0];
+    res.json({
+      success: true,
+      user: {
+        id: userRow.id,
+        email: userRow.email,
+        name: userRow.name,
+        avatar: userRow.avatar,
+        provider: userRow.provider,
+        createdAt: userRow.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Error during Google authentication:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
 // 2. 獲取所有活動列表（支援搜尋與分類過濾）
 app.get('/api/events', async (req, res) => {
   try {

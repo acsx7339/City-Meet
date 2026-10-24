@@ -24,6 +24,20 @@ CREATE INDEX IF NOT EXISTS idx_events_source_type ON events(source_type);
 CREATE INDEX IF NOT EXISTS idx_events_heat_score ON events(heat_score DESC);
 CREATE INDEX IF NOT EXISTS idx_events_coords ON events(latitude, longitude);
 
+-- 使用者會員帳號資料表
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(100) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    avatar VARCHAR(500),
+    provider VARCHAR(50) DEFAULT 'google',
+    google_id VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
 -- 預設種子活動（若尚未有資料時自動插入）
 INSERT INTO events (
     id, title, source_type, storm_level, heat_score, category,

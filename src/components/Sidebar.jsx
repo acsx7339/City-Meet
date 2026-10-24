@@ -2,7 +2,7 @@ import React from 'react';
 import { STORM_LEVELS } from '../data/mockEvents';
 import TonightFilter from './TonightFilter';
 import SafetyBadge from './SafetyBadge';
-import { Wind, Radio, Plus, Users, MapPin, ChevronRight, Activity } from 'lucide-react';
+import { Wind, Radio, Plus, Users, MapPin, ChevronRight, Activity, LogIn } from 'lucide-react';
 
 export default function Sidebar({
   events,
@@ -14,7 +14,10 @@ export default function Sidebar({
   onSelectSource,
   searchQuery,
   onSearchChange,
-  onOpenCreateModal
+  onOpenCreateModal,
+  currentUser,
+  onOpenLoginModal,
+  onLogout
 }) {
   return (
     <aside
@@ -61,26 +64,74 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* 發起活動按鈕 */}
-        <button
-          onClick={onOpenCreateModal}
-          className="glass-pill"
-          style={{
-            padding: '7px 12px',
-            fontSize: '12px',
-            fontWeight: 600,
-            background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-            border: '1px solid var(--accent-cyan)',
-            color: '#fff',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
-        >
-          <Plus size={14} />
-          <span>自主造局</span>
-        </button>
+        {/* 使用者狀態與造局按鈕 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid var(--accent-cyan)', objectFit: 'cover' }}
+                title={`${currentUser.name} (${currentUser.email})`}
+              />
+              <button
+                onClick={onLogout}
+                className="glass-pill"
+                style={{
+                  padding: '5px 8px',
+                  fontSize: '11px',
+                  color: 'var(--text-muted)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  cursor: 'pointer'
+                }}
+                title="登出"
+              >
+                登出
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenLoginModal}
+              className="glass-pill"
+              style={{
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <LogIn size={13} />
+              <span>登入</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenCreateModal}
+            className="glass-pill"
+            style={{
+              padding: '7px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+              border: '1px solid var(--accent-cyan)',
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Plus size={14} />
+            <span>自主造局</span>
+          </button>
+        </div>
       </div>
 
       {/* 今晚去哪裡模式過濾器 */}

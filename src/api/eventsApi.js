@@ -117,3 +117,45 @@ export async function updateUserStatus(eventId, statusKey) {
 
   return { success: false, source: 'local' };
 }
+
+// 取得後端 Google Client ID 配置
+export async function getAuthConfig() {
+  try {
+    const res = await fetch('/api/auth/config');
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[eventsApi] Failed to fetch auth config:', err.message);
+  }
+  return { googleClientId: '' };
+}
+
+// Google 登入驗證（支援 Google 官方 Token 或免配置即刻體驗）
+export async function loginWithGoogle(authPayload) {
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(authPayload)
+    });
+    if (res.ok) {
+      const result = await res.json();
+      if (result.user) {
+        localStorage.setItem('city_meet_user', JSON.stringify(result.user));
+        return { success: true, user: result.user, source: 'postgres' };
+      }
+    }
+  } catch (err) {
+    console.warn('[eventsApi] PostgreSQL auth error, fallback to local session:', err.message);
+  }
+
+  // 離線自動降級與本地暫存
+  const fallbackUser = {
+    id: `usr-${authPayload.googleId || Date.now()}`,
+    email: authPayload.email || 'demo.user@gmail.com',
+    name: authPayload.name || 'City Explorer',
+    avatar: authPayload.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=explorer',
+    provider: 'google'
+  };
+  localStorage.setItem('city_meet_user', JSON.stringify(fallbackUser));
+  return { success: true, user: fallbackUser, source: 'local' };
+}
