@@ -231,4 +231,51 @@ h1, h2, h3, h4, .font-heading {
   margin-bottom: 6px;
 }
 
+/* 地址搜尋定位標記 (Search Location Pin) */
+.custom-search-pin-wrapper {
+  background: transparent !important;
+  border: none !important;
+}
+
+.search-location-pin {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-location-core {
+  width: 14px;
+  height: 14px;
+  background: var(--accent-cyan);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.9);
+  z-index: 2;
+}
+
+.search-location-pulse {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 240, 255, 0.45);
+  animation: radarPulse 1.8s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+
 

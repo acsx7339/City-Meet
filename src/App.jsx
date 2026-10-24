@@ -16,6 +16,7 @@ import CreateStormModal from './components/CreateStormModal';
 import AdminConsole from './components/AdminConsole';
 import TonightFilter from './components/TonightFilter';
 import LoginModal from './components/LoginModal';
+import { calculateDistance } from './utils/geocoding';
 import { Wind, Plus, Compass, Search, LogIn } from 'lucide-react';
 
 export default function App() {
@@ -72,6 +73,21 @@ export default function App() {
     return null;
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [searchedLocation, setSearchedLocation] = useState(null);
+
+  const handleSelectLocation = (loc) => {
+    if (!loc) {
+      setSearchedLocation(null);
+      return;
+    }
+    // 計算該地點周邊 2.5 公里內的氣旋活動數量
+    const nearby = events.filter(evt => {
+      if (!evt.coordinates || evt.coordinates.length < 2) return false;
+      const dist = calculateDistance(loc.lat, loc.lng, evt.coordinates[0], evt.coordinates[1]);
+      return dist <= 2.5;
+    });
+    setSearchedLocation({ ...loc, nearbyCount: nearby.length });
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('city_meet_user');
@@ -235,6 +251,7 @@ export default function App() {
           currentUser={currentUser}
           onOpenLoginModal={() => setShowLoginModal(true)}
           onLogout={handleLogout}
+          onSelectLocation={handleSelectLocation}
         />
       )}
 
@@ -375,6 +392,7 @@ export default function App() {
                 onSelectSource={setSourceFilter}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
+                onSelectLocation={handleSelectLocation}
               />
             </div>
           )}
@@ -388,6 +406,7 @@ export default function App() {
           selectedEvent={selectedEvent}
           onSelectEvent={handleSelectEvent}
           isMobile={isMobile}
+          searchedLocation={searchedLocation}
         />
       </main>
 

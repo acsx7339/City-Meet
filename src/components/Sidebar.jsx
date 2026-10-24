@@ -17,7 +17,8 @@ export default function Sidebar({
   onOpenCreateModal,
   currentUser,
   onOpenLoginModal,
-  onLogout
+  onLogout,
+  onSelectLocation
 }) {
   return (
     <aside
@@ -142,6 +143,7 @@ export default function Sidebar({
         onSelectSource={onSelectSource}
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
+        onSelectLocation={onSelectLocation}
       />
 
       {/* 活動風暴列表標題與計數 */}

@@ -13,12 +13,14 @@ export default function CycloneMap({
   events,
   selectedEvent,
   onSelectEvent,
-  isMobile
+  isMobile,
+  searchedLocation
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const engineRef = useRef(null);
+  const searchMarkerRef = useRef(null);
 
   // 初始化 Leaflet 地圖與 Canvas 引擎
   useEffect(() => {
@@ -124,6 +126,56 @@ export default function CycloneMap({
       );
     }
   }, [selectedEvent?.id]);
+
+  // 當使用者搜尋特定地址或地標時，平滑飛入該地點並標記雷達脈衝點
+  useEffect(() => {
+    if (!mapInstanceRef.current || !searchedLocation) return;
+
+    const { lat, lng, shortName, displayName, nearbyCount } = searchedLocation;
+
+    mapInstanceRef.current.flyTo([lat, lng], 15, {
+      duration: 1.5,
+      easeLinearity: 0.25
+    });
+
+    // 移除舊的搜尋標記
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
+      searchMarkerRef.current = null;
+    }
+
+    const pinHtml = `
+      <div class="search-location-pin">
+        <div class="search-location-core"></div>
+        <div class="search-location-pulse"></div>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      html: pinHtml,
+      className: 'custom-search-pin-wrapper',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    const marker = L.marker([lat, lng], { icon }).addTo(mapInstanceRef.current);
+    marker.bindPopup(`
+      <div style="font-family: inherit; padding: 4px; min-width: 170px;">
+        <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+          <span>📍</span>
+          <span>${shortName || '搜尋地址'}</span>
+        </div>
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.3;">
+          ${displayName || ''}
+        </div>
+        <div style="font-size: 11px; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 3px 6px; border-radius: 4px; display: inline-block;">
+          🌪️ 方圓 2 公里內有 ${nearbyCount !== undefined ? nearbyCount : 0} 個社交氣旋
+        </div>
+      </div>
+    `).openPopup();
+
+    searchMarkerRef.current = marker;
+  }, [searchedLocation]);
 
   // 控制項：縮放與復位
   const handleZoomIn = () => mapInstanceRef.current && mapInstanceRef.current.zoomIn();
