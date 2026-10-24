@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import BottomSheet from './components/BottomSheet';
 import StormDetailModal from './components/StormDetailModal';
 import CreateStormModal from './components/CreateStormModal';
+import AdminConsole from './components/AdminConsole';
 import { Wind, Plus, Compass } from 'lucide-react';
 
 export default function App() {
@@ -16,6 +17,32 @@ export default function App() {
     }
     return SEED_EVENTS;
   });
+
+  // 獨立私有後台路由判斷 (支援 /admin, /#admin, ?admin)
+  const [isAdminRoute, setIsAdminRoute] = useState(() => {
+    return (
+      window.location.pathname.startsWith('/admin') ||
+      window.location.hash === '#admin' ||
+      window.location.search.includes('admin')
+    );
+  });
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setIsAdminRoute(
+        window.location.pathname.startsWith('/admin') ||
+        window.location.hash === '#admin' ||
+        window.location.search.includes('admin')
+      );
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
@@ -37,6 +64,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('city_meet_events', JSON.stringify(events));
   }, [events]);
+
+  // 若為後台網址，直接渲染管理員控制台（前台不顯示任何入口連結）
+  if (isAdminRoute) {
+    return <AdminConsole events={events} onUpdateEvents={setEvents} />;
+  }
 
   // 過濾活動清單
   const filteredEvents = useMemo(() => {
