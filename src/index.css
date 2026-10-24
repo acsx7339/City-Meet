@@ -125,3 +125,9 @@ h1, h2, h3, h4, .font-heading {
 .leaflet-control-attribution {
   display: none !important;
 }
+
+/* 官方免費 OpenStreetMap 暗黑濾鏡（徹底去除 API KEY REQUIRED 水印，零金鑰） */
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(78%) contrast(95%) grayscale(20%);
+}
+

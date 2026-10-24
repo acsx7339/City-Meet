@@ -34,9 +34,8 @@ export default function CycloneMap({
       attributionControl: false
     });
 
-    // 2. 載入極致暗夜科技質感的 CartoDB DarkMatter 瓦片
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd',
+    // 2. 載入官方開源 OpenStreetMap 圖資（搭配全域暗黑濾鏡，100% 免金鑰、零水印）
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19
     }).addTo(map);
 
