@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SEED_EVENTS } from './data/mockEvents';
 import { mapScoreToStormLevel } from './utils/stormCalculator';
+import {
+  getEvents,
+  createEvent,
+  addMood,
+  updateUserStatus,
+  batchImportEvents
+} from './api/eventsApi';
 import CycloneMap from './components/CycloneMap';
 import Sidebar from './components/Sidebar';
 import BottomSheet from './components/BottomSheet';
@@ -64,7 +71,16 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 持久化儲存活動
+  // 初始化自 PostgreSQL 資料庫載入活動（具備離線自動降級能力）
+  useEffect(() => {
+    getEvents().then(({ data, source }) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setEvents(data);
+      }
+    });
+  }, []);
+
+  // 持久化儲存活動至本機快取
   useEffect(() => {
     localStorage.setItem('city_meet_events_v2', JSON.stringify(events));
   }, [events]);
@@ -106,7 +122,7 @@ export default function App() {
     }
   };
 
-  // 新增現場小心聲（熱度提升並動態計算風暴等級升級）
+  // 新增現場小心聲（熱度提升、動態升級風暴半徑並同步至 PostgreSQL）
   const handleAddMood = (eventId, text, emoji) => {
     const newMood = {
       id: `m-${Date.now()}`,
@@ -129,9 +145,12 @@ export default function App() {
         return evt;
       })
     );
+
+    // 同步寫入 PostgreSQL
+    addMood(eventId, text, emoji);
   };
 
-  // 更新使用者的抵達狀態 (我出發了 / 快到了 / 已抵達)
+  // 更新使用者的抵達狀態 (我出發了 / 快到了 / 已抵達，同步至 PostgreSQL)
   const handleUpdateUserStatus = (eventId, statusKey) => {
     setUserStatuses(prev => ({ ...prev, [eventId]: statusKey }));
 
@@ -153,17 +172,27 @@ export default function App() {
         return evt;
       })
     );
+
+    // 同步寫入 PostgreSQL
+    updateUserStatus(eventId, statusKey);
   };
 
-  // 全民自主造局：建立新氣旋
+  // 全民自主造局：建立新氣旋（同步儲存至 PostgreSQL）
   const handleCreateStorm = (newStorm) => {
     setEvents(prev => [newStorm, ...prev]);
     setSelectedEventId(newStorm.id);
+    createEvent(newStorm);
+  };
+
+  // 後台管理匯入更新（同步批次寫入 PostgreSQL）
+  const handleUpdateEvents = async (updatedEvents) => {
+    setEvents(updatedEvents);
+    await batchImportEvents(updatedEvents);
   };
 
   // 若為後台網址，在所有 Hook 調用完畢後再渲染（嚴格遵守 React Hook 規範）
   if (isAdminRoute) {
-    return <AdminConsole events={events} onUpdateEvents={setEvents} />;
+    return <AdminConsole events={events} onUpdateEvents={handleUpdateEvents} />;
   }
 
   return (
