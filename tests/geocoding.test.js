@@ -1,7 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { calculateDistance, getLocalLandmarks, parseNominatimResults } from '../src/utils/geocoding';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { calculateDistance, getLocalLandmarks, parseNominatimResults, searchAddress } from '../src/utils/geocoding';
 
 describe('Geocoding & Distance Utilities', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('correctly calculates Haversine distance between two coordinates in km', () => {
     // 台北車站 [25.0478, 121.5170] 到 台北101 [25.0339, 121.5645] 約 5 公里
     const dist = calculateDistance(25.0478, 121.5170, 25.0339, 121.5645);
@@ -54,5 +62,67 @@ describe('Geocoding & Distance Utilities', () => {
     // 板橋新北市民廣場 [25.0135, 121.4655] 遠於 5 公里
     const distToBanqiao = calculateDistance(25.0250, 121.5280, 25.0135, 121.4655);
     expect(distToBanqiao).toBeGreaterThan(5.0);
+  });
+
+  describe('searchAddress', () => {
+    it('returns empty array if query length < 2', async () => {
+      expect(await searchAddress('')).toEqual([]);
+      expect(await searchAddress(' ')).toEqual([]);
+      expect(await searchAddress('a')).toEqual([]);
+    });
+
+    it('returns empty array if query is empty after trim', () => {
+      const results = getLocalLandmarks('   ');
+      expect(results).toEqual([]);
+    });
+
+    it('returns combined results on successful fetch and deduplicates by lat/lng', async () => {
+      // "台北車站" 有本地快取 lat: 25.0478, lng: 121.5170
+      // 模擬 Nominatim 也回傳相同的座標以及一個不同的座標
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            display_name: '台北車站, 重複資料',
+            lat: '25.0478', // 重複
+            lon: '121.5170'
+          },
+          {
+            display_name: '台北車站地下街, 新資料',
+            lat: '25.0500', // 新資料
+            lon: '121.5180',
+            type: 'subway'
+          }
+        ]
+      });
+
+      const results = await searchAddress('台北車站');
+
+      // local 應該有 1 筆 "台北車站"，remote 應該被去重 1 筆，新增 1 筆
+      expect(results.length).toBe(2);
+      expect(results[0].shortName).toBe('台北車站'); // 來自 local
+      expect(results[1].shortName).toBe('台北車站地下街'); // 來自 remote
+    });
+
+    it('returns only local matches if fetch fails (fallback mechanism)', async () => {
+      fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      // 搜尋 '101' 本地會有 '台北101 / 市貿'
+      const results = await searchAddress('101');
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].shortName).toBe('台北101 / 市貿');
+    });
+  });
+
+  describe('parseNominatimResults coverage', () => {
+    it('returns empty array if input is not array', () => {
+      expect(parseNominatimResults(null)).toEqual([]);
+      expect(parseNominatimResults('string')).toEqual([]);
+    });
+
+    it('handles missing display_name gracefully', () => {
+      const parsed = parseNominatimResults([{ lat: '25.0', lon: '121.0' }]);
+      expect(parsed[0].shortName).toBe('未知地點');
+    });
   });
 });

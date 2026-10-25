@@ -38,6 +38,11 @@ describe('City-Meet 核心氣象演算法單元測試 (TDD)', () => {
       const score = calculateHeatScore(stats, { isOfficial: false, decay: 10 });
       expect(score).toBe(0);
     });
+
+    it('沒有傳遞參數時，應該使用預設值計算並回傳 0', () => {
+      const score = calculateHeatScore();
+      expect(score).toBe(0);
+    });
   });
 
   describe('2. 熱度分級與颱風強度映射 (mapScoreToStormLevel)', () => {

@@ -1,9 +1,23 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import TonightFilter from '../../src/components/TonightFilter';
 import { CATEGORIES } from '../../src/data/mockEvents';
+import * as geocoding from '../../src/utils/geocoding';
 
 describe('TonightFilter', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(geocoding, 'searchAddress').mockResolvedValue([
+      { shortName: '台北車站', displayName: '台北車站, 台灣', lat: 25.0478, lng: 121.5170, name: '台北車站' }
+    ]);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   const defaultProps = {
     activeCategory: 'all',
     onSelectCategory: vi.fn(),
@@ -114,6 +128,176 @@ describe('TonightFilter', () => {
       value: origGeolocation,
       writable: true,
       configurable: true
+    });
+  });
+  describe('Geocoding Interactions', () => {
+    it('debounces searchAddress and shows dropdown with results', async () => {
+      render(<TonightFilter {...defaultProps} searchQuery="台北" />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(geocoding.searchAddress).toHaveBeenCalledWith('台北');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+    });
+
+    it('clears suggestions if query is too short', async () => {
+      render(<TonightFilter {...defaultProps} searchQuery="a" />);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(geocoding.searchAddress).not.toHaveBeenCalled();
+    });
+
+    it('selects location and closes dropdown on click', async () => {
+      const onSelectLocation = vi.fn();
+      const onSearchChange = vi.fn();
+      render(<TonightFilter {...defaultProps} searchQuery="台北" onSelectLocation={onSelectLocation} onSearchChange={onSearchChange} />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('台北車站'));
+
+      expect(onSearchChange).toHaveBeenCalledWith('台北車站');
+      expect(onSelectLocation).toHaveBeenCalledWith(expect.objectContaining({ shortName: '台北車站' }));
+      expect(screen.queryByText('地標／地址定位（點擊直飛）：')).not.toBeInTheDocument();
+    });
+
+    it('selects top location on Enter key', async () => {
+      const onSelectLocation = vi.fn();
+      render(<TonightFilter {...defaultProps} searchQuery="台北" onSelectLocation={onSelectLocation} />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/搜尋/i);
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+      expect(onSelectLocation).toHaveBeenCalled();
+      expect(screen.queryByText('地標／地址定位（點擊直飛）：')).not.toBeInTheDocument();
+    });
+
+    it('closes dropdown on Escape key', async () => {
+      render(<TonightFilter {...defaultProps} searchQuery="台北" />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText(/搜尋/i);
+      fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
+
+      expect(screen.queryByText('地標／地址定位（點擊直飛）：')).not.toBeInTheDocument();
+    });
+
+    it('handles geocoding error gracefully', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      geocoding.searchAddress.mockRejectedValueOnce(new Error('API failed'));
+
+      render(<TonightFilter {...defaultProps} searchQuery="台北" />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith('Geocoding error:', expect.any(Error));
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it('opens dropdown on focus if there are suggestions', async () => {
+      render(<TonightFilter {...defaultProps} searchQuery="台北" />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+
+      // Close it first with Escape
+      const input = screen.getByPlaceholderText(/搜尋/i);
+      fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
+      expect(screen.queryByText('台北車站')).not.toBeInTheDocument();
+
+      // Focus again to open
+      fireEvent.focus(input);
+      expect(screen.getByText('台北車站')).toBeInTheDocument();
+    });
+
+    it('shows clear search button when there is a query, and triggers clear', async () => {
+      const onSearchChange = vi.fn();
+      const onSelectLocation = vi.fn();
+      render(<TonightFilter {...defaultProps} searchQuery="台北" onSearchChange={onSearchChange} onSelectLocation={onSelectLocation} />);
+
+      const clearBtn = screen.getByTitle('清除');
+      expect(clearBtn).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(clearBtn);
+      });
+
+      expect(onSearchChange).toHaveBeenCalledWith('');
+      expect(onSelectLocation).toHaveBeenCalledWith(null);
+    });
+
+    it('shows searchedLocation and unselects when input changes', async () => {
+      const onSelectLocation = vi.fn();
+      const searchedLoc = { name: '台北101' };
+      render(<TonightFilter {...defaultProps} searchQuery="台北101" searchedLocation={searchedLoc} onSelectLocation={onSelectLocation} />);
+
+      expect(screen.getByText(/已鎖定：/)).toBeInTheDocument();
+      expect(screen.getByText('台北101')).toBeInTheDocument();
+
+      const input = screen.getByPlaceholderText(/搜尋/i);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '台北10' } });
+      });
+
+      expect(onSelectLocation).toHaveBeenCalledWith(null);
+    });
+
+    it('closes dropdown on click outside', async () => {
+      render(<TonightFilter {...defaultProps} searchQuery="台北" />);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('台北車站')).toBeInTheDocument();
+      });
+
+      // trigger document mousedown
+      act(() => {
+        fireEvent.mouseDown(document.body);
+      });
+
+      expect(screen.queryByText('地標／地址定位（點擊直飛）：')).not.toBeInTheDocument();
     });
   });
 });
