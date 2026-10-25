@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CATEGORIES } from '../data/mockEvents';
 import { searchAddress } from '../utils/geocoding';
-import { Sparkles, Flame, Compass, Search, MapPin, Loader2, Navigation, X } from 'lucide-react';
+import { Sparkles, Flame, Compass, Search, MapPin, Loader2, Navigation, X, LocateFixed } from 'lucide-react';
 
 export default function TonightFilter({
   activeCategory,
@@ -15,6 +15,7 @@ export default function TonightFilter({
 }) {
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isGpsLocating, setIsGpsLocating] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef(null);
 
@@ -84,6 +85,48 @@ export default function TonightFilter({
     setShowDropdown(false);
   };
 
+  // GPS 地理定位
+  const handleGpsLocate = () => {
+    if (!navigator.geolocation) {
+      alert('您的瀏覽器不支援 GPS 地理定位功能');
+      return;
+    }
+    setIsGpsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsGpsLocating(false);
+        setShowDropdown(false);
+        const { latitude, longitude } = pos.coords;
+        if (onSearchChange) {
+          onSearchChange('我的目前位置 (GPS)');
+        }
+        if (onSelectLocation) {
+          onSelectLocation({
+            name: '我的目前位置 (GPS)',
+            shortName: '我的目前位置',
+            displayName: `即時 GPS 座標 [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`,
+            lat: latitude,
+            lng: longitude,
+            isGps: true
+          });
+        }
+      },
+      (err) => {
+        setIsGpsLocating(false);
+        let msg = '無法取得您的 GPS 定位資訊';
+        if (err.code === 1) {
+          msg = '請允許瀏覽器定位權限以啟用 GPS 即時定位功能';
+        } else if (err.code === 2) {
+          msg = '目前無法偵測到您的 GPS 位置，請稍後再試';
+        } else if (err.code === 3) {
+          msg = 'GPS 定位連線逾時，請檢查網路或稍後再試';
+        }
+        alert(msg);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} ref={containerRef}>
       {/* 搜尋關鍵字與地址定位輸入框 */}
@@ -114,7 +157,7 @@ export default function TonightFilter({
             placeholder="搜尋活動、商圈或地址 (如: 師大、台北101)..."
             style={{
               width: '100%',
-              padding: '8px 30px 8px 30px',
+              padding: (searchQuery || searchedLocation) ? '8px 54px 8px 30px' : '8px 32px 8px 30px',
               borderRadius: '9999px',
               border: searchedLocation ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
               background: 'rgba(15, 23, 42, 0.75)',
@@ -127,12 +170,41 @@ export default function TonightFilter({
             }}
           />
 
+          {/* GPS 即時定位按鈕 */}
+          <button
+            type="button"
+            onClick={handleGpsLocate}
+            disabled={isGpsLocating}
+            style={{
+              position: 'absolute',
+              right: (searchQuery || searchedLocation) ? '28px' : '9px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: isGpsLocating ? 'var(--accent-cyan)' : 'var(--text-dim)',
+              cursor: isGpsLocating ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '3px',
+              borderRadius: '50%',
+              transition: 'color 0.15s'
+            }}
+            title="GPS 即時定位（探索周邊氣旋）"
+          >
+            {isGpsLocating ? (
+              <Loader2 size={13} className="animate-spin" style={{ color: 'var(--accent-cyan)' }} />
+            ) : (
+              <LocateFixed size={13} />
+            )}
+          </button>
+
           {(searchQuery || searchedLocation) && (
             <button
               onClick={handleClearSearch}
               style={{
                 position: 'absolute',
-                right: '10px',
+                right: '9px',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 background: 'none',
@@ -171,6 +243,30 @@ export default function TonightFilter({
                 overflowY: 'auto'
               }}
             >
+              {/* 快速 GPS 定位選項 */}
+              <button
+                type="button"
+                onClick={handleGpsLocate}
+                disabled={isGpsLocating}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  border: '1px dashed rgba(0, 240, 255, 0.4)',
+                  background: 'rgba(0, 240, 255, 0.08)',
+                  color: 'var(--accent-cyan)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '2px'
+                }}
+              >
+                {isGpsLocating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>使用 GPS 定位目前位置</span>
+              </button>
+
               <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Navigation size={11} />
                 <span>地標／地址定位（點擊直飛）：</span>

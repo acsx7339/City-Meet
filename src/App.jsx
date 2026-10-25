@@ -428,6 +428,7 @@ export default function App() {
           onSelectEvent={handleSelectEvent}
           isMobile={isMobile}
           searchedLocation={searchedLocation}
+          onSelectLocation={handleSelectLocation}
         />
       </main>
 

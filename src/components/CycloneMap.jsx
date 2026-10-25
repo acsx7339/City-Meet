@@ -4,24 +4,26 @@
  * 上層疊加高效能 CycloneEngine Canvas 粒子視圖
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { CycloneEngine } from './CycloneCanvas';
 import { SEARCH_RADIUS_KM } from '../utils/geocoding';
-import { Compass, Plus, Minus, Navigation } from 'lucide-react';
+import { Compass, Plus, Minus, Navigation, LocateFixed, Loader2 } from 'lucide-react';
 
 export default function CycloneMap({
   events,
   selectedEvent,
   onSelectEvent,
   isMobile,
-  searchedLocation
+  searchedLocation,
+  onSelectLocation
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const engineRef = useRef(null);
   const searchMarkerRef = useRef(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   // 初始化 Leaflet 地圖與 Canvas 引擎
   useEffect(() => {
@@ -128,11 +130,20 @@ export default function CycloneMap({
     }
   }, [selectedEvent?.id]);
 
-  // 當使用者搜尋特定地址或地標時，平滑飛入該地點並標記雷達脈衝點
+  // 當使用者搜尋特定地址、地標或啟動 GPS 定位時，平滑飛入該地點並標記雷達脈衝點
   useEffect(() => {
-    if (!mapInstanceRef.current || !searchedLocation) return;
+    if (!mapInstanceRef.current) return;
 
-    const { lat, lng, shortName, displayName, nearbyCount } = searchedLocation;
+    // 若取消定位，移除舊的雷達標記
+    if (!searchedLocation) {
+      if (searchMarkerRef.current) {
+        searchMarkerRef.current.remove();
+        searchMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const { lat, lng, shortName, displayName, nearbyCount, isGps, name } = searchedLocation;
 
     mapInstanceRef.current.flyTo([lat, lng], 15, {
       duration: 1.5,
@@ -147,7 +158,7 @@ export default function CycloneMap({
 
     const pinHtml = `
       <div class="search-location-pin">
-        <div class="search-location-core"></div>
+        <div class="search-location-core" style="${isGps ? 'background: #00f0ff; box-shadow: 0 0 16px rgba(0, 240, 255, 1);' : ''}"></div>
         <div class="search-location-pulse"></div>
       </div>
     `;
@@ -163,8 +174,8 @@ export default function CycloneMap({
     marker.bindPopup(`
       <div style="font-family: inherit; padding: 4px; min-width: 170px;">
         <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
-          <span>📍</span>
-          <span>${shortName || '搜尋地址'}</span>
+          <span>${isGps ? '🎯' : '📍'}</span>
+          <span>${shortName || name || '搜尋地址'}</span>
         </div>
         <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.3;">
           ${displayName || ''}
@@ -177,6 +188,47 @@ export default function CycloneMap({
 
     searchMarkerRef.current = marker;
   }, [searchedLocation]);
+
+  // GPS 瀏覽器地理定位
+  const handleLocateUser = () => {
+    if (!navigator.geolocation) {
+      alert('您的瀏覽器不支援 GPS 地理定位功能');
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const { latitude, longitude } = pos.coords;
+        if (onSelectLocation) {
+          onSelectLocation({
+            name: '我的目前位置 (GPS)',
+            shortName: '我的目前位置',
+            displayName: `即時 GPS 座標 [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`,
+            lat: latitude,
+            lng: longitude,
+            isGps: true
+          });
+        } else if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([latitude, longitude], 15);
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        let msg = '無法取得您的 GPS 定位資訊';
+        if (err.code === 1) {
+          msg = '請允許瀏覽器定位權限以啟用 GPS 即時定位功能';
+        } else if (err.code === 2) {
+          msg = '目前無法偵測到您的 GPS 位置，請稍後再試';
+        } else if (err.code === 3) {
+          msg = 'GPS 定位連線逾時，請檢查網路或稍後再試';
+        }
+        alert(msg);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  };
 
   // 控制項：縮放與復位
   const handleZoomIn = () => mapInstanceRef.current && mapInstanceRef.current.zoomIn();
@@ -221,6 +273,34 @@ export default function CycloneMap({
           gap: '8px'
         }}
       >
+        {/* GPS 即時定位按鈕 */}
+        <button
+          onClick={handleLocateUser}
+          disabled={isLocating}
+          title="GPS 即時定位（周邊氣旋）"
+          className="glass-panel"
+          style={{
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isLocating ? 'var(--accent-cyan)' : '#fff',
+            cursor: isLocating ? 'wait' : 'pointer',
+            border: isLocating ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+            borderRadius: '10px',
+            background: isLocating ? 'rgba(0, 240, 255, 0.2)' : undefined,
+            boxShadow: isLocating ? '0 0 12px rgba(0, 240, 255, 0.4)' : undefined,
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isLocating ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <LocateFixed size={18} />
+          )}
+        </button>
+
         <button
           onClick={handleResetView}
           title="回台北中心"

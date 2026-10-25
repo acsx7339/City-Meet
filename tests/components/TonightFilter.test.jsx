@@ -79,4 +79,41 @@ describe('TonightFilter', () => {
       expect(defaultProps.onSelectCategory).toHaveBeenCalledWith(CATEGORIES[1].id);
     }
   });
+
+  it('renders GPS location button and triggers geolocation on click', () => {
+    const onSelectLocation = vi.fn();
+    const getCurrentPositionMock = vi.fn((success) => {
+      success({ coords: { latitude: 25.0421, longitude: 121.5324 } });
+    });
+
+    // Mock geolocation
+    const origGeolocation = navigator.geolocation;
+    Object.defineProperty(navigator, 'geolocation', {
+      value: { getCurrentPosition: getCurrentPositionMock },
+      writable: true,
+      configurable: true
+    });
+
+    render(<TonightFilter {...defaultProps} onSelectLocation={onSelectLocation} />);
+    const gpsBtn = screen.getByTitle(/GPS 即時定位/i);
+    expect(gpsBtn).toBeInTheDocument();
+
+    fireEvent.click(gpsBtn);
+    expect(getCurrentPositionMock).toHaveBeenCalled();
+    expect(onSelectLocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: '我的目前位置 (GPS)',
+        lat: 25.0421,
+        lng: 121.5324,
+        isGps: true
+      })
+    );
+
+    // Restore geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      value: origGeolocation,
+      writable: true,
+      configurable: true
+    });
+  });
 });
