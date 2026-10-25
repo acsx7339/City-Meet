@@ -42,11 +42,7 @@ const OFFICIAL_SAMPLE_PACK = [
     },
     participantsCount: 890,
     arrivalStats: { departed: 220, onTheWay: 380, arrived: 290 },
-    moodParticles: [
-      { id: 'm-sample-1', text: '巨型主燈太震撼了！', emoji: '🏮', author: '阿宏' },
-      { id: 'm-sample-2', text: '北門光雕投影秀每半小時一次', emoji: '✨', author: 'Joyce' },
-      { id: 'm-sample-3', text: '周邊傳統小吃攤好多人！', emoji: '🍡', author: '小佩' }
-    ]
+    moodParticles: []
   },
   {
     title: '華山草地黑膠搖擺音樂聚',
@@ -70,10 +66,7 @@ const OFFICIAL_SAMPLE_PACK = [
     },
     participantsCount: 42,
     arrivalStats: { departed: 10, onTheWay: 14, arrived: 18 },
-    moodParticles: [
-      { id: 'm-sample-4', text: '現場播 80 年代 City Pop 好浪漫！', emoji: '📻', author: '老王' },
-      { id: 'm-sample-5', text: '微風配啤酒剛剛好', emoji: '🍺', author: 'Kai' }
-    ]
+    moodParticles: []
   }
 ];
 

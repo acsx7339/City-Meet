@@ -17,7 +17,7 @@ describe('活動批次匯入驗證器單元測試 (eventImporter)', () => {
     expect(result.events.length).toBe(1);
     expect(result.events[0].id).toBeDefined();
     expect(result.events[0].stormLevel).toBeDefined(); // 自動補齊分級
-    expect(result.events[0].moodParticles).toBeInstanceOf(Array);
+    expect(result.events[0].moodParticles).toEqual([]); // 匯入活動不預填小心聲，保留給現場使用者自填
   });
 
   it('若缺少必要欄位（如 title 或 coordinates），應拒絕並記錄錯誤', () => {

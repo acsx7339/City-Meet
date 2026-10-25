@@ -69,25 +69,8 @@ export function parseAndValidateEvents(input) {
       };
     }
 
-    // 整理小心聲
-    let moodParticles = [];
-    if (Array.isArray(item.moodParticles) && item.moodParticles.length > 0) {
-      moodParticles = item.moodParticles.map((m, mIdx) => ({
-        id: m.id || `m-imp-${Date.now()}-${mIdx}`,
-        text: typeof m === 'string' ? m : m.text || '活動熱度聚集！',
-        emoji: (typeof m === 'object' && m.emoji) || '💬',
-        author: (typeof m === 'object' && m.author) || '官方快報'
-      }));
-    } else {
-      moodParticles = [
-        {
-          id: `m-imp-${Date.now()}-0`,
-          text: '已加入城市社交氣象台！',
-          emoji: '✨',
-          author: '氣象台'
-        }
-      ];
-    }
+    // 現場小心聲（由活動參與者在現場自行填寫，匯入資料預設為空陣列）
+    const moodParticles = [];
 
     // 封裝標準活動物件
     const eventObj = {
