@@ -15,7 +15,7 @@ describe('TonightFilter', () => {
 
   it('renders search input when onSearchChange is provided', () => {
     render(<TonightFilter {...defaultProps} />);
-    const input = screen.getByPlaceholderText(/搜尋氣旋/i);
+    const input = screen.getByPlaceholderText(/搜尋/i);
     expect(input).toBeInTheDocument();
     expect(input).toHaveValue('');
   });
@@ -23,13 +23,13 @@ describe('TonightFilter', () => {
   it('does not render search input when onSearchChange is not provided', () => {
     const propsWithoutSearch = { ...defaultProps, onSearchChange: undefined };
     render(<TonightFilter {...propsWithoutSearch} />);
-    const input = screen.queryByPlaceholderText(/搜尋氣旋/i);
+    const input = screen.queryByPlaceholderText(/搜尋/i);
     expect(input).not.toBeInTheDocument();
   });
 
   it('calls onSearchChange when search input changes', () => {
     render(<TonightFilter {...defaultProps} />);
-    const input = screen.getByPlaceholderText(/搜尋氣旋/i);
+    const input = screen.getByPlaceholderText(/搜尋/i);
     fireEvent.change(input, { target: { value: '台北' } });
     expect(defaultProps.onSearchChange).toHaveBeenCalledWith('台北');
   });
