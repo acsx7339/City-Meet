@@ -4,7 +4,6 @@ dist-ssr
 *.local
 .DS_Store
 .superpowers/sdd/
-
 # 本地機密與後台管理帳密文件（嚴禁提交至 GitHub）
 ADMIN_CREDENTIALS.md
 LOCAL_SECRETS.md
@@ -13,3 +12,5 @@ LOCAL_SECRETS.md
 .env.*
 .env.local
 
+# 測試覆蓋率報表
+coverage
