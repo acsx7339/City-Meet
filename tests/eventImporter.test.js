@@ -40,4 +40,39 @@ describe('活動批次匯入驗證器單元測試 (eventImporter)', () => {
     expect(result.success).toBe(false);
     expect(result.errors[0]).toContain('JSON 格式錯誤');
   });
+
+  it('當未提供人數與熱度時，應根據標題關鍵字與類別智慧推估颱風等級', () => {
+    const rawEvents = [
+      {
+        title: '2026 台北燈節光雕音樂季',
+        coordinates: [25.0483, 121.5133],
+        isOfficial: true
+      },
+      {
+        title: '信義區微醺黑膠派對',
+        category: 'party',
+        coordinates: [25.0355, 121.5670]
+      },
+      {
+        title: '社區公園晨間散步',
+        coordinates: [25.0300, 121.5300]
+      }
+    ];
+
+    const result = parseAndValidateEvents(rawEvents);
+    expect(result.success).toBe(true);
+    expect(result.events.length).toBe(3);
+
+    // 1. 台北燈節 (含燈節/音樂季等盛事關鍵字) 應自動升級為強烈颱風 (strong)
+    expect(result.events[0].stormLevel).toBe('strong');
+    expect(result.events[0].heatScore).toBeGreaterThanOrEqual(500);
+    expect(result.events[0].participantsCount).toBeGreaterThanOrEqual(500);
+
+    // 2. 微醺黑膠派對 (含黑膠/派對等中型活動) 應為輕度或中度颱風
+    expect(['mild', 'moderate']).toContain(result.events[1].stormLevel);
+    expect(result.events[1].heatScore).toBeGreaterThan(80);
+
+    // 3. 常態小散步應為低氣壓或氣旋種子
+    expect(['seed', 'depression']).toContain(result.events[2].stormLevel);
+  });
 });

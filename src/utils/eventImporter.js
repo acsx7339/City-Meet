@@ -4,6 +4,79 @@
 
 import { mapScoreToStormLevel } from './stormCalculator';
 
+/**
+ * 智慧推估活動規模與熱度分
+ * 當外部爬蟲或開放資料未提供人數或熱度時，自動分析活動標題關鍵字、領域分類與官方身分
+ */
+export function inferEventScale(title = '', category = 'culture', isOfficial = false, rawParticipants, rawHeatScore) {
+  let participantsCount = Number(rawParticipants);
+  let heatScore = Number(rawHeatScore);
+
+  const hasValidHeat = !isNaN(heatScore) && heatScore > 0;
+  const hasValidParticipants = !isNaN(participantsCount) && participantsCount > 0;
+
+  if (hasValidHeat && hasValidParticipants) {
+    return { heatScore, participantsCount };
+  }
+
+  const titleLower = (title || '').toLowerCase();
+
+  // 1. 頂級大型盛事關鍵字 (Mega Events -> 強烈颱風等級 🔴)
+  const isMegaEvent =
+    titleLower.includes('跨年') ||
+    titleLower.includes('燈節') ||
+    titleLower.includes('嘉年華') ||
+    titleLower.includes('音樂祭') ||
+    titleLower.includes('博覽會') ||
+    titleLower.includes('巨星演唱會') ||
+    titleLower.includes('萬人') ||
+    titleLower.includes('煙火');
+
+  // 2. 中型熱門活動關鍵字 (Medium Popular Events -> 中度颱風等級 🟠)
+  const isMediumEvent =
+    isMegaEvent ||
+    category === 'music' ||
+    category === 'party' ||
+    titleLower.includes('市集') ||
+    titleLower.includes('黑膠') ||
+    titleLower.includes('野餐') ||
+    titleLower.includes('啤酒節') ||
+    titleLower.includes('微醺') ||
+    titleLower.includes('路跑') ||
+    titleLower.includes('派對') ||
+    titleLower.includes('電音');
+
+  // 3. 根據特徵賦予合理預估人潮規模
+  if (!hasValidParticipants) {
+    if (isMegaEvent) {
+      participantsCount = isOfficial ? 880 : 500;
+    } else if (isMediumEvent) {
+      participantsCount = isOfficial ? 280 : 80;
+    } else if (category === 'culture' || category === 'food') {
+      participantsCount = isOfficial ? 120 : 35;
+    } else {
+      participantsCount = isOfficial ? 80 : 15;
+    }
+  }
+
+  // 4. 根據特徵賦予動態熱度分
+  if (!hasValidHeat) {
+    if (isMegaEvent) {
+      heatScore = 560; // 強烈颱風 (strong)
+    } else if (isMediumEvent) {
+      heatScore = isOfficial ? 360 : 135; // 官方中度颱風 (moderate) 或 民間輕颱 (mild)
+    } else if (isOfficial) {
+      heatScore = 220; // 官方中度颱風
+    } else if (category === 'culture' || category === 'food') {
+      heatScore = 50; // 民間常態藝文美食 -> 熱帶低氣壓 (depression)
+    } else {
+      heatScore = 25; // 民間零星小局 -> 氣旋種子 (seed)
+    }
+  }
+
+  return { heatScore, participantsCount };
+}
+
 export function parseAndValidateEvents(input) {
   let parsed;
 
@@ -48,18 +121,18 @@ export function parseAndValidateEvents(input) {
       return;
     }
 
-    // 計算熱度與分級：若未提供 heatScore，依人潮量級與官方屬性自動換算
-    const participantsCount = Number(item.participantsCount) || 20;
+    // 官方身分判斷
     const isOfficial = item.sourceType === 'official' || Boolean(item.isOfficial);
+    const category = item.category || 'culture';
 
-    let heatScore = Number(item.heatScore);
-    if (!heatScore || isNaN(heatScore)) {
-      if (isOfficial) {
-        heatScore = participantsCount >= 500 ? 560 : participantsCount >= 100 ? 350 : 220;
-      } else {
-        heatScore = participantsCount >= 50 ? 120 : 35;
-      }
-    }
+    // 智慧推估熱度與人潮規模（當外部 API 缺少人數或熱度時，自動分析標題關鍵字與分類）
+    const { heatScore, participantsCount } = inferEventScale(
+      item.title,
+      category,
+      isOfficial,
+      item.participantsCount,
+      item.heatScore
+    );
     const stormLevel = item.stormLevel || mapScoreToStormLevel(heatScore);
 
     // 整理暴風眼集合點
@@ -106,7 +179,11 @@ export function parseAndValidateEvents(input) {
       assemblyPoint,
       safetyTrust,
       participantsCount,
-      arrivalStats: item.arrivalStats || { departed: 5, onTheWay: 8, arrived: 7 },
+      arrivalStats: item.arrivalStats || {
+        departed: Math.max(1, Math.round(participantsCount * 0.25)),
+        onTheWay: Math.max(1, Math.round(participantsCount * 0.45)),
+        arrived: Math.max(1, Math.round(participantsCount * 0.3))
+      },
       moodParticles
     };
 
