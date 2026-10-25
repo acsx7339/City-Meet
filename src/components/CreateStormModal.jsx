@@ -9,8 +9,7 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
   const [area, setArea] = useState('東區商圈');
   const [assemblyName, setAssemblyName] = useState('');
   const [assemblyDetail, setAssemblyDetail] = useState('');
-  const [initialMood, setInitialMood] = useState('');
-  const [initialEmoji, setInitialEmoji] = useState('✨');
+  const [timeDesc, setTimeDesc] = useState('今晚 20:30 集合');
 
   // 監聽鍵盤 Escape 鍵自動關閉彈窗
   useEffect(() => {
@@ -20,8 +19,6 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
-
-  const EMOJI_OPTIONS = ['✨', '🍜', '☕', '🎸', '📷', '🏃', '🎉', '💬'];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -35,12 +32,12 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
       id: `evt-ugc-${Date.now()}`,
       title: title.trim(),
       sourceType: 'ugc',
-      stormLevel: 'seed', // 初發起為氣旋種子
+      stormLevel: 'seed', // 初發起為氣旋種子，後續由現場參與者動態升級
       heatScore: 25,
       category,
       coordinates: [baseLat, baseLng],
-      area,
-      timeDesc: '即刻造局・熱度聚集中',
+      area: area.trim() || '台北市區',
+      timeDesc: timeDesc.trim() || '即刻造局・熱度聚集中',
       assemblyPoint: {
         name: assemblyName.trim(),
         detail: assemblyDetail.trim() || '依現場氣旋標示集合',
@@ -50,18 +47,11 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
         score: 90,
         isOfficial: false,
         hostName: '我 (發起人)',
-        flags: ['實名手機認證', '初發起氣旋種子']
+        flags: ['實名認證發起', '初發起氣旋種子']
       },
       participantsCount: 1,
       arrivalStats: { departed: 0, onTheWay: 0, arrived: 1 },
-      moodParticles: [
-        {
-          id: `m-init-${Date.now()}`,
-          text: initialMood.trim() || '新風暴已發起，歡迎同好加入！',
-          emoji: initialEmoji,
-          author: '主辦人'
-        }
-      ]
+      moodParticles: [] // 現場小心聲預設為空，保留給參與者在活動現場自由留言
     };
 
     onCreateStorm(newStorm);
@@ -200,32 +190,35 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
 
           <div>
             <label className="form-label-title">
-              <span>第一顆現場小心聲（跟隨氣旋旋轉）</span>
+              <span>集合時間（時）*</span>
             </label>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-              {EMOJI_OPTIONS.map(em => (
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              {['今晚 20:30', '今晚 21:30', '即刻出發', '週六下午 15:00'].map(t => (
                 <button
-                  key={em}
+                  key={t}
                   type="button"
-                  onClick={() => setInitialEmoji(em)}
+                  onClick={() => setTimeDesc(t)}
                   style={{
-                    width: '30px',
-                    height: '30px',
+                    padding: '4px 10px',
                     borderRadius: '6px',
-                    border: initialEmoji === em ? '1px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.08)',
-                    background: initialEmoji === em ? 'rgba(0, 240, 255, 0.2)' : 'rgba(30, 41, 59, 0.5)',
-                    cursor: 'pointer'
+                    fontSize: '11px',
+                    border: timeDesc === t ? '1px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.1)',
+                    background: timeDesc === t ? 'rgba(0, 240, 255, 0.2)' : 'rgba(30, 41, 59, 0.5)',
+                    color: timeDesc === t ? 'var(--accent-cyan)' : '#cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
                   }}
                 >
-                  {em}
+                  {t}
                 </button>
               ))}
             </div>
             <input
               type="text"
-              value={initialMood}
-              onChange={e => setInitialMood(e.target.value)}
-              placeholder="例如：剛坐下等大家，微風好舒服！"
+              required
+              value={timeDesc}
+              onChange={e => setTimeDesc(e.target.value)}
+              placeholder="例如：今晚 20:30、半小時後、週六 15:00"
               className="form-input-field"
             />
           </div>

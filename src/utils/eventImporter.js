@@ -48,8 +48,18 @@ export function parseAndValidateEvents(input) {
       return;
     }
 
-    // 計算熱度與分級
-    const heatScore = Number(item.heatScore) || 50;
+    // 計算熱度與分級：若未提供 heatScore，依人潮量級與官方屬性自動換算
+    const participantsCount = Number(item.participantsCount) || 20;
+    const isOfficial = item.sourceType === 'official' || Boolean(item.isOfficial);
+
+    let heatScore = Number(item.heatScore);
+    if (!heatScore || isNaN(heatScore)) {
+      if (isOfficial) {
+        heatScore = participantsCount >= 500 ? 560 : participantsCount >= 100 ? 350 : 220;
+      } else {
+        heatScore = participantsCount >= 50 ? 120 : 35;
+      }
+    }
     const stormLevel = item.stormLevel || mapScoreToStormLevel(heatScore);
 
     // 整理暴風眼集合點
@@ -72,11 +82,21 @@ export function parseAndValidateEvents(input) {
     // 現場小心聲（由活動參與者在現場自行填寫，匯入資料預設為空陣列）
     const moodParticles = [];
 
+    // 官方權威安全信任標籤
+    const safetyTrust = item.safetyTrust || {
+      score: isOfficial ? 99 : 92,
+      isOfficial,
+      hostName: item.hostName || (isOfficial ? '官方主辦機構' : '外部匯入主辦方'),
+      flags: isOfficial
+        ? ['官方大型盛事', '封街人行步道', '現場醫療救護站駐點']
+        : ['批次資料庫匯入', '實名登記主辦']
+    };
+
     // 封裝標準活動物件
     const eventObj = {
       id: item.id || `evt-import-${Date.now()}-${index}`,
       title: item.title,
-      sourceType: item.sourceType || (item.isOfficial ? 'official' : 'ugc'),
+      sourceType: isOfficial ? 'official' : 'ugc',
       stormLevel,
       heatScore,
       category: item.category || 'culture',
@@ -84,13 +104,8 @@ export function parseAndValidateEvents(input) {
       area: item.area || '台北市區',
       timeDesc: item.timeDesc || '近期熱門活動',
       assemblyPoint,
-      safetyTrust: item.safetyTrust || {
-        score: item.sourceType === 'official' ? 99 : 92,
-        isOfficial: item.sourceType === 'official',
-        hostName: item.hostName || '外部匯入主辦方',
-        flags: item.sourceType === 'official' ? ['外部對接認證', '官方大型活動'] : ['批次資料庫匯入']
-      },
-      participantsCount: Number(item.participantsCount) || 20,
+      safetyTrust,
+      participantsCount,
       arrivalStats: item.arrivalStats || { departed: 5, onTheWay: 8, arrived: 7 },
       moodParticles
     };
