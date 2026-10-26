@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { query, checkConnection } from './db.js';
+import { fetchAndSyncCultureEvents } from './sync-taiwan-events.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -66,6 +67,26 @@ app.post('/api/admin/login', (req, res) => {
     success: false,
     error: '管理員帳號或密碼錯誤，請重新輸入'
   });
+});
+
+// 管理員一鍵同步全台活動 (文化部 Open Data API)
+app.post('/api/admin/sync-events', async (req, res) => {
+  try {
+    const limit = parseInt(req.body.limit, 10) || 100;
+    const result = await fetchAndSyncCultureEvents(limit);
+    res.json({
+      success: true,
+      count: result.count,
+      events: result.events,
+      message: `成功從文化部同步並寫入 ${result.count} 筆全台活動資料`
+    });
+  } catch (error) {
+    console.error('Error during Taiwan events sync:', error);
+    res.status(500).json({
+      success: false,
+      error: `同步全台活動失敗: ${error.message}`
+    });
+  }
 });
 
 // --- 使用者認證與 Google 登入 API ---
@@ -280,7 +301,7 @@ app.post('/api/events/batch', async (req, res) => {
         evt.timeDesc || '近期舉辦',
         JSON.stringify(evt.assemblyPoint || {}),
         JSON.stringify(evt.safetyTrust || { score: 95, isOfficial: true }),
-        evt.participantsCount || 10,
+        evt.participantsCount !== undefined ? evt.participantsCount : 0,
         JSON.stringify(evt.arrivalStats || { departed: 0, onTheWay: 0, arrived: 0 }),
         JSON.stringify(evt.moodParticles || [])
       ];

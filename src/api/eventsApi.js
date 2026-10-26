@@ -159,3 +159,95 @@ export async function loginWithGoogle(authPayload) {
   localStorage.setItem('city_meet_user', JSON.stringify(fallbackUser));
   return { success: true, user: fallbackUser, source: 'local' };
 }
+
+// 全台活動即時抓取同步 (優先由後端匯入 PostgreSQL，支援前端直連備援)
+export async function syncTaiwanEvents(limit = 100) {
+  // 1. 優先請求後端 API
+  try {
+    const res = await fetch('/api/admin/sync-events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.events)) {
+        return { success: true, count: data.count, events: data.events, source: 'postgres' };
+      }
+    }
+  } catch (err) {
+    console.warn('[eventsApi] Backend sync failed, attempting direct Open Data fetch:', err.message);
+  }
+
+  // 2. 備援模式：前端直接向文化部 iCulture 開放資料 API 請求 (具備 CORS 支援)
+  try {
+    const directRes = await fetch('https://cloud.culture.tw/frontsite/trans/SearchShowAction.do?method=doFindTypeJ&category=all');
+    if (!directRes.ok) throw new Error(`HTTP ${directRes.status}`);
+    const rawList = await directRes.json();
+    if (!Array.isArray(rawList)) throw new Error('Invalid Open Data format');
+
+    const validEvents = [];
+    for (const item of rawList) {
+      if (validEvents.length >= limit) break;
+      const show = item.showInfo?.[0];
+      if (!show) continue;
+      const lat = parseFloat(show.latitude);
+      const lng = parseFloat(show.longitude);
+      if (isNaN(lat) || isNaN(lng) || lat < 21.8 || lat > 26.2 || lng < 119.2 || lng > 122.5) continue;
+
+      const title = (item.title || '精彩活動').trim();
+      const hostName = item.masterUnit?.[0] || '文化部認證主辦';
+      const isOfficial = hostName.includes('館') || hostName.includes('政府') || hostName.includes('局') || hostName.includes('中心');
+      const hitRate = parseInt(item.hitRate, 10) || 120;
+      const heatScore = Math.min(950, Math.max(45, Math.floor(hitRate / 3) + 20));
+
+      let stormLevel = 'seed';
+      if (heatScore >= 600) stormLevel = 'strong';
+      else if (heatScore >= 250) stormLevel = 'moderate';
+      else if (heatScore >= 80) stormLevel = 'mild';
+      else if (heatScore >= 30) stormLevel = 'depression';
+
+      let category = 'culture';
+      const lower = `${title} ${item.descriptionFilterHtml || ''}`.toLowerCase();
+      if (lower.includes('市集') || lower.includes('派對') || lower.includes('夜市')) category = 'party';
+      else if (lower.includes('音樂') || lower.includes('演唱會') || lower.includes('樂團')) category = 'music';
+      else if (lower.includes('運動') || lower.includes('路跑') || lower.includes('馬拉松')) category = 'sports';
+      else if (lower.includes('美食') || lower.includes('咖啡') || lower.includes('甜點')) category = 'food';
+
+      // 實際參與人數：初始為 0，需真實使用者點擊出發/抵達才會增加
+      const participantsCount = 0;
+      const arrivalStats = { departed: 0, onTheWay: 0, arrived: 0 };
+
+      validEvents.push({
+        id: `evt-moc-${item.UID}`,
+        title,
+        sourceType: isOfficial ? 'official' : 'commercial',
+        stormLevel,
+        heatScore,
+        category,
+        coordinates: [lat, lng],
+        area: (show.location ? show.location.replace(/^\d+/, '').slice(0, 8) : '全台活動').trim(),
+        timeDesc: show.time ? show.time.slice(0, 16) : (item.startDate || '近期展演'),
+        assemblyPoint: {
+          name: show.locationName || '場館主要入口處',
+          detail: show.location || '請至現場服務台集合',
+          backup: '鄰近捷運/公車站出口'
+        },
+        safetyTrust: {
+          score: isOfficial ? 96 : 88,
+          isOfficial,
+          hostName,
+          flags: isOfficial ? ['官方藝文認證', '公立場館安全規劃'] : ['合法售票展演', '實名主辦登記']
+        },
+        participantsCount,
+        arrivalStats,
+        moodParticles: [] // 乾淨無預設心聲，純留給真實現場使用者發言
+      });
+    }
+
+    return { success: true, count: validEvents.length, events: validEvents, source: 'client-moc' };
+  } catch (clientErr) {
+    throw new Error(`無法連接全台開放資料 API: ${clientErr.message}`);
+  }
+}
+

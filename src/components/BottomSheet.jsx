@@ -100,7 +100,9 @@ export default function BottomSheet({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Navigation size={14} color="#f59e0b" />
-          <span style={{ color: '#f1f5f9' }}>暴風眼集合點：{event.assemblyPoint.name}</span>
+          <span style={{ color: '#f1f5f9' }}>
+            暴風眼集合點：{typeof event.assemblyPoint === 'string' ? event.assemblyPoint : (event.assemblyPoint?.name || '依現場標示集合')}
+          </span>
         </div>
       </div>
 

@@ -74,6 +74,8 @@ export default function App() {
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [searchedLocation, setSearchedLocation] = useState(null);
+  const [mapViewport, setMapViewport] = useState(null); // { south, north, west, east, center, zoom }
+  const [viewportSyncEnabled, setViewportSyncEnabled] = useState(true); // 預設隨地圖拖曳動態切換列表
 
   const handleSelectLocation = (loc) => {
     if (!loc) {
@@ -120,24 +122,26 @@ export default function App() {
     return events.find(e => e.id === selectedEventId) || null;
   }, [events, selectedEventId]);
 
-  // 過濾活動清單：若鎖定特定地址/地標，與地圖完全同步顯示周邊氣旋；否則依關鍵字搜尋
-  const filteredEvents = useMemo(() => {
-    let list = events.filter(evt => {
-      // 1. 雙軌來源過濾
-      if (sourceFilter !== 'all' && evt.sourceType !== sourceFilter) {
-        return false;
-      }
-      // 2. 分類過濾
-      if (activeCategory !== 'all' && evt.category !== activeCategory) {
-        return false;
+  // 1. 地圖專屬活動清單（套用來源與分類，但不受視野裁切，確保平滑拖曳時地圖上皆有氣旋）
+  const mapEvents = useMemo(() => {
+    return events.filter(evt => {
+      if (sourceFilter !== 'all' && evt.sourceType !== sourceFilter) return false;
+      if (activeCategory !== 'all' && evt.category !== activeCategory) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return evt.title.toLowerCase().includes(q) || evt.area.toLowerCase().includes(q);
       }
       return true;
     });
+  }, [events, sourceFilter, activeCategory, searchQuery]);
 
-    // 3. 若有定位地址/地標（使用者點選了地址/地標建議）
-    // 左側清單與地圖無縫聯動：列出方圓預設半徑內的氣旋，並由近至遠排序！
+  // 2. 左側列表專屬活動（隨地圖視野拖曳即時更換，或依搜尋地址聯動）
+  const filteredEvents = useMemo(() => {
+    let list = mapEvents;
+
+    // A. 若使用者特定定位了地址/地標，列出方圓半徑內的氣旋
     if (searchedLocation && searchedLocation.lat && searchedLocation.lng) {
-      const nearbyList = list
+      return list
         .map(evt => {
           const dist = (evt.coordinates && evt.coordinates.length >= 2)
             ? calculateDistance(searchedLocation.lat, searchedLocation.lng, evt.coordinates[0], evt.coordinates[1])
@@ -146,29 +150,45 @@ export default function App() {
         })
         .filter(evt => evt.distanceToSearch <= SEARCH_RADIUS_KM)
         .sort((a, b) => a.distanceToSearch - b.distanceToSearch);
-
-      return nearbyList;
     }
 
-    // 4. 一般關鍵字文字搜尋（若尚未點選地址定位）
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(evt =>
-        evt.title.toLowerCase().includes(q) ||
-        evt.area.toLowerCase().includes(q)
-      );
+    // B. 隨地圖拖曳視野動態切換（預設開啟）：只列出當前地圖可視矩形範圍內的活動！
+    if (viewportSyncEnabled && mapViewport && !searchQuery.trim()) {
+      const latBuffer = (mapViewport.north - mapViewport.south) * 0.05;
+      const lngBuffer = (mapViewport.east - mapViewport.west) * 0.05;
+      const s = mapViewport.south - latBuffer;
+      const n = mapViewport.north + latBuffer;
+      const w = mapViewport.west - lngBuffer;
+      const e = mapViewport.east + lngBuffer;
+
+      const inViewport = list.filter(evt => {
+        if (!evt.coordinates || evt.coordinates.length < 2) return false;
+        const [lat, lng] = evt.coordinates;
+        return lat >= s && lat <= n && lng >= w && lng <= e;
+      });
+
+      // 依據距離當前地圖螢幕中心的距離由近至遠排序
+      const center = mapViewport.center;
+      return inViewport
+        .map(evt => {
+          const dist = calculateDistance(center[0], center[1], evt.coordinates[0], evt.coordinates[1]);
+          return { ...evt, distanceToCenter: dist };
+        })
+        .sort((a, b) => {
+          if (Math.abs(a.distanceToCenter - b.distanceToCenter) < 2) {
+            return b.heatScore - a.heatScore;
+          }
+          return a.distanceToCenter - b.distanceToCenter;
+        });
     }
 
     return list;
-  }, [events, sourceFilter, activeCategory, searchQuery, searchedLocation]);
+  }, [mapEvents, searchedLocation, viewportSyncEnabled, mapViewport, searchQuery]);
 
-  // 選中事件處理
+  // 選中事件處理（點擊氣旋或卡片，直接開啟活動詳情彈窗）
   const handleSelectEvent = (event) => {
     setSelectedEventId(event.id);
-    if (!isMobile) {
-      // 桌面端點擊直接開詳情視窗
-      setShowDetailModal(true);
-    }
+    setShowDetailModal(true);
   };
 
   // 新增現場小心聲（熱度提升、動態升級風暴半徑並同步至 PostgreSQL）
@@ -272,6 +292,9 @@ export default function App() {
           onLogout={handleLogout}
           onSelectLocation={handleSelectLocation}
           searchedLocation={searchedLocation}
+          viewportSyncEnabled={viewportSyncEnabled}
+          onToggleViewportSync={() => setViewportSyncEnabled(prev => !prev)}
+          totalEventsCount={events.length}
         />
       )}
 
@@ -423,12 +446,13 @@ export default function App() {
       {/* 右側 (桌面 65% / 手機 100%)：滿版暗夜向量地圖與 Canvas 動態氣旋 */}
       <main style={{ flex: 1, height: '100%', position: 'relative' }}>
         <CycloneMap
-          events={filteredEvents}
+          events={mapEvents}
           selectedEvent={selectedEvent}
           onSelectEvent={handleSelectEvent}
           isMobile={isMobile}
           searchedLocation={searchedLocation}
           onSelectLocation={handleSelectLocation}
+          onViewportChange={setMapViewport}
         />
       </main>
 

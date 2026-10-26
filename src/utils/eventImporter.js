@@ -126,7 +126,7 @@ export function parseAndValidateEvents(input) {
     const category = item.category || 'culture';
 
     // 智慧推估熱度與人潮規模（當外部 API 缺少人數或熱度時，自動分析標題關鍵字與分類）
-    const { heatScore, participantsCount } = inferEventScale(
+    const { heatScore, participantsCount: inferredParticipants } = inferEventScale(
       item.title,
       category,
       isOfficial,
@@ -178,11 +178,11 @@ export function parseAndValidateEvents(input) {
       timeDesc: item.timeDesc || '近期熱門活動',
       assemblyPoint,
       safetyTrust,
-      participantsCount,
+      participantsCount: item.participantsCount !== undefined ? Number(item.participantsCount) : inferredParticipants,
       arrivalStats: item.arrivalStats || {
-        departed: Math.max(1, Math.round(participantsCount * 0.25)),
-        onTheWay: Math.max(1, Math.round(participantsCount * 0.45)),
-        arrived: Math.max(1, Math.round(participantsCount * 0.3))
+        departed: 0,
+        onTheWay: 0,
+        arrived: 0
       },
       moodParticles
     };

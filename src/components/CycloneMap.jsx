@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { CycloneEngine } from './CycloneCanvas';
 import { SEARCH_RADIUS_KM } from '../utils/geocoding';
-import { Compass, Plus, Minus, Navigation, LocateFixed, Loader2 } from 'lucide-react';
+import { Compass, Plus, Minus, Navigation, LocateFixed, Loader2, Sun, Moon } from 'lucide-react';
 
 export default function CycloneMap({
   events,
@@ -16,7 +16,8 @@ export default function CycloneMap({
   onSelectEvent,
   isMobile,
   searchedLocation,
-  onSelectLocation
+  onSelectLocation,
+  onViewportChange
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -24,6 +25,7 @@ export default function CycloneMap({
   const engineRef = useRef(null);
   const searchMarkerRef = useRef(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(false); // 預設為第二張圖的清爽向量風格 (false)
 
   // 初始化 Leaflet 地圖與 Canvas 引擎
   useEffect(() => {
@@ -39,9 +41,10 @@ export default function CycloneMap({
       attributionControl: false
     });
 
-    // 2. 載入官方開源 OpenStreetMap 圖資（搭配全域暗黑濾鏡，100% 免金鑰、零水印）
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19
+    // 2. 載入清爽向量地圖圖資（第二張圖風格：Google Maps 清爽向量、現代乾淨線條）
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
     }).addTo(map);
 
     mapInstanceRef.current = map;
@@ -88,12 +91,33 @@ export default function CycloneMap({
         }
       });
 
+      // 點擊氣旋中心或風場，即刻觸發開啟活動詳情彈窗
       map.on('click', (e) => {
         if (engineRef.current) {
           const pt = e.containerPoint;
           engineRef.current.handleCoordClick(pt.x, pt.y);
         }
       });
+
+      // 6. 監聽地圖拖曳與縮放結束，即時回傳當前地圖可視視野範圍 (Viewport Bounds)
+      const notifyViewport = () => {
+        if (!mapInstanceRef.current || !onViewportChange) return;
+        const bounds = mapInstanceRef.current.getBounds();
+        const center = mapInstanceRef.current.getCenter();
+        onViewportChange({
+          south: bounds.getSouth(),
+          north: bounds.getNorth(),
+          west: bounds.getWest(),
+          east: bounds.getEast(),
+          center: [center.lat, center.lng],
+          zoom: mapInstanceRef.current.getZoom()
+        });
+      };
+
+      map.on('moveend', notifyViewport);
+      map.on('zoomend', notifyViewport);
+      // 初次地圖就緒時立即回傳可視範圍
+      setTimeout(notifyViewport, 150);
     }
 
     return () => {
@@ -244,6 +268,7 @@ export default function CycloneMap({
       {/* 底層 Leaflet 地圖容器 */}
       <div
         ref={mapContainerRef}
+        className={isDarkTheme ? 'map-dark-theme' : ''}
         style={{ width: '100%', height: '100%', zIndex: 1 }}
       />
 
@@ -318,6 +343,27 @@ export default function CycloneMap({
           }}
         >
           <Compass size={20} />
+        </button>
+
+        {/* 風格切換按鈕：清爽向量 (第二張圖) / 暗黑科技 */}
+        <button
+          onClick={() => setIsDarkTheme(prev => !prev)}
+          title={isDarkTheme ? '切換回清爽簡潔向量地圖 (第二張圖風格)' : '切換為暗黑夜間模式'}
+          className="glass-panel"
+          style={{
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isDarkTheme ? '#f59e0b' : '#38bdf8',
+            cursor: 'pointer',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '10px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isDarkTheme ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button
           onClick={handleZoomIn}

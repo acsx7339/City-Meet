@@ -47,8 +47,15 @@ export default function StormDetailModal({
     onUpdateUserStatus(event.id, statusKey);
   };
 
-  const totalArrivals = (event.arrivalStats.departed || 0) + (event.arrivalStats.onTheWay || 0) + (event.arrivalStats.arrived || 0);
-  const arrivedPercent = totalArrivals > 0 ? Math.round((event.arrivalStats.arrived / totalArrivals) * 100) : 0;
+  const arrivalStats = event.arrivalStats || { departed: 0, onTheWay: 0, arrived: 0 };
+  const totalReported = (arrivalStats.departed || 0) + (arrivalStats.onTheWay || 0) + (arrivalStats.arrived || 0);
+  const arrivedPercent = totalReported > 0 ? Math.round(((arrivalStats.arrived || 0) / totalReported) * 100) : 0;
+
+  const assembly = typeof event.assemblyPoint === 'string'
+    ? { name: event.assemblyPoint, detail: '請依現場導引與標示集合', backup: '' }
+    : (event.assemblyPoint || { name: '活動現場集合點', detail: '依現場標示集合', backup: '' });
+
+  const moodParticles = Array.isArray(event.moodParticles) ? event.moodParticles : [];
 
   return (
     <div
@@ -113,14 +120,14 @@ export default function StormDetailModal({
             <span>暴風眼核心集合點</span>
           </div>
           <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
-            {event.assemblyPoint.name}
+            {assembly.name}
           </div>
           <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
-            📍 細節說明：{event.assemblyPoint.detail}
+            📍 細節說明：{assembly.detail}
           </div>
-          {event.assemblyPoint.backup && (
+          {assembly.backup && (
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              備用集合點：{event.assemblyPoint.backup}
+              備用集合點：{assembly.backup}
             </div>
           )}
         </div>
@@ -141,8 +148,10 @@ export default function StormDetailModal({
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
               我的即時狀態與現場集結度
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--accent-cyan)' }}>
-              現場已抵達 {event.arrivalStats.arrived} 人 ({arrivedPercent}%)
+            <span style={{ fontSize: '11px', color: totalReported > 0 ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
+              {totalReported > 0
+                ? `現場已抵達 ${arrivalStats.arrived || 0} 人 (${arrivedPercent}%)`
+                : '尚無人打卡・成為第一位回報者！'}
             </span>
           </div>
 
@@ -154,9 +163,9 @@ export default function StormDetailModal({
           {/* 三態按鈕切換 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '4px' }}>
             {[
-              { key: 'departed', label: '我出發了 🚶', count: event.arrivalStats.departed },
-              { key: 'onTheWay', label: '我快到了 🚴', count: event.arrivalStats.onTheWay },
-              { key: 'arrived', label: '已抵達現場 🎉', count: event.arrivalStats.arrived }
+              { key: 'departed', label: '我出發了 🚶', count: arrivalStats.departed || 0 },
+              { key: 'onTheWay', label: '我快到了 🚴', count: arrivalStats.onTheWay || 0 },
+              { key: 'arrived', label: '已抵達現場 🎉', count: arrivalStats.arrived || 0 }
             ].map(item => {
               const isActive = userStatus === item.key;
               return (
@@ -192,7 +201,7 @@ export default function StormDetailModal({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={14} color="var(--accent-cyan)" />
-              <span>現場小心聲氣流 ({event.moodParticles.length})</span>
+              <span>現場小心聲氣流 ({moodParticles.length})</span>
             </span>
             <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
               即時同步於地圖氣旋旋轉
@@ -209,27 +218,33 @@ export default function StormDetailModal({
               paddingRight: '4px'
             }}
           >
-            {event.moodParticles.map(mood => (
-              <div
-                key={mood.id}
-                style={{
-                  background: 'rgba(30, 41, 59, 0.5)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  borderRadius: '10px',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '16px' }}>{mood.emoji}</span>
-                  <span style={{ color: '#f1f5f9' }}>{mood.text}</span>
-                </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{mood.author}</span>
+            {moodParticles.length === 0 ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', padding: '12px', textAlign: 'center', background: 'rgba(30, 41, 59, 0.3)', borderRadius: '10px' }}>
+                目前尚無心聲・成為第一位在現場留言的人！
               </div>
-            ))}
+            ) : (
+              moodParticles.map(mood => (
+                <div
+                  key={mood.id}
+                  style={{
+                    background: 'rgba(30, 41, 59, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>{mood.emoji}</span>
+                    <span style={{ color: '#f1f5f9' }}>{mood.text}</span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{mood.author}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

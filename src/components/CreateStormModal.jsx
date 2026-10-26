@@ -50,7 +50,7 @@ export default function CreateStormModal({ onClose, onCreateStorm }) {
         flags: ['實名認證發起', '初發起氣旋種子']
       },
       participantsCount: 1,
-      arrivalStats: { departed: 0, onTheWay: 0, arrived: 1 },
+      arrivalStats: { departed: 0, onTheWay: 0, arrived: 0 },
       moodParticles: [] // 現場小心聲預設為空，保留給參與者在活動現場自由留言
     };
 

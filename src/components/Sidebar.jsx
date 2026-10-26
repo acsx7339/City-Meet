@@ -2,7 +2,7 @@ import React from 'react';
 import { STORM_LEVELS } from '../data/mockEvents';
 import TonightFilter from './TonightFilter';
 import SafetyBadge from './SafetyBadge';
-import { Wind, Radio, Plus, Users, MapPin, ChevronRight, Activity, LogIn } from 'lucide-react';
+import { Wind, Radio, Plus, Users, MapPin, ChevronRight, Activity, LogIn, Compass } from 'lucide-react';
 
 export default function Sidebar({
   events,
@@ -19,7 +19,10 @@ export default function Sidebar({
   onOpenLoginModal,
   onLogout,
   onSelectLocation,
-  searchedLocation
+  searchedLocation,
+  viewportSyncEnabled = true,
+  onToggleViewportSync,
+  totalEventsCount
 }) {
   return (
     <aside
@@ -156,14 +159,40 @@ export default function Sidebar({
               <MapPin size={13} color="var(--accent-cyan)" />
               <span>{searchedLocation.name} 周邊氣旋 ({events.length})</span>
             </>
+          ) : viewportSyncEnabled ? (
+            <>
+              <Compass size={13} color="var(--accent-cyan)" />
+              <span>當前視野氣旋 ({events.length})</span>
+            </>
           ) : (
-            <span>當前熱門氣旋 ({events.length})</span>
+            <span>全台熱門氣旋 ({events.length})</span>
           )}
         </span>
-        <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Activity size={12} color="var(--accent-cyan)" />
-          <span>{searchedLocation ? '方圓 2.5km' : '動態能量更新中'}</span>
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {!searchedLocation && onToggleViewportSync && (
+            <button
+              onClick={onToggleViewportSync}
+              title={viewportSyncEnabled ? '目前正隨地圖移動即時切換（點擊切回全台風暴）' : '切換為隨地圖移動即時切換'}
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '9999px',
+                border: viewportSyncEnabled ? '1px solid rgba(0, 240, 255, 0.4)' : '1px solid rgba(255,255,255,0.15)',
+                background: viewportSyncEnabled ? 'rgba(0, 240, 255, 0.15)' : 'rgba(255,255,255,0.06)',
+                color: viewportSyncEnabled ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Activity size={11} color={viewportSyncEnabled ? 'var(--accent-cyan)' : 'var(--text-muted)'} />
+              <span>{viewportSyncEnabled ? '視野連動' : '全台熱門'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 風暴列表清單 (滾動區) */}
@@ -196,6 +225,29 @@ export default function Sidebar({
                 >
                   清除地點鎖定，查看全城氣旋
                 </button>
+              </div>
+            ) : viewportSyncEnabled ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <div>🗺️ 當前地圖視野內暫無氣旋活動</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  可縮小地圖、拖曳至其他縣市商圈，或切換為全台風暴
+                </div>
+                {onToggleViewportSync && (
+                  <button
+                    onClick={onToggleViewportSync}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 240, 255, 0.15)',
+                      border: '1px solid var(--accent-cyan)',
+                      color: '#fff',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    查看全台熱門氣旋 ({totalEventsCount || 0})
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -267,7 +319,7 @@ export default function Sidebar({
                       <MapPin size={12} color="var(--accent-cyan)" />
                       {evt.area}
                     </span>
-                    {evt.distanceToSearch !== undefined && (
+                    {evt.distanceToSearch !== undefined ? (
                       <span style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -281,7 +333,21 @@ export default function Sidebar({
                       }}>
                         📍 距此 {evt.distanceToSearch.toFixed(1)} km
                       </span>
-                    )}
+                    ) : evt.distanceToCenter !== undefined ? (
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        color: 'rgba(0, 240, 255, 0.9)',
+                        fontWeight: 600,
+                        background: 'rgba(0, 240, 255, 0.1)',
+                        border: '1px solid rgba(0, 240, 255, 0.2)',
+                        padding: '1px 6px',
+                        borderRadius: '4px'
+                      }}>
+                        約 {evt.distanceToCenter < 1 ? `${Math.round(evt.distanceToCenter * 1000)}m` : `${evt.distanceToCenter.toFixed(1)}km`}
+                      </span>
+                    ) : null}
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Users size={12} />
                       {evt.participantsCount} 人參與

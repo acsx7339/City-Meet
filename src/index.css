@@ -140,8 +140,11 @@ h1, h2, h3, h4, .font-heading {
   text-decoration: underline;
 }
 
-/* 官方免費 OpenStreetMap 暗黑濾鏡（徹底去除 API KEY REQUIRED 水印，零金鑰） */
+/* 官方免費向量地圖圖層（第二張圖風格：簡潔清晰、現代乾淨向量線條、無雜訊） */
 .leaflet-tile-pane {
+  filter: none;
+}
+.map-dark-theme .leaflet-tile-pane {
   filter: invert(100%) hue-rotate(180deg) brightness(78%) contrast(95%) grayscale(20%);
 }
 

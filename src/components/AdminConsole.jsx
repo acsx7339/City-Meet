@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { parseAndValidateEvents } from '../utils/eventImporter';
 import { SEED_EVENTS, STORM_LEVELS } from '../data/mockEvents';
+import { syncTaiwanEvents } from '../api/eventsApi';
 import {
   Upload,
   FileCode,
@@ -15,7 +16,9 @@ import {
   Sparkles,
   Lock,
   KeyRound,
-  LogOut
+  LogOut,
+  Globe,
+  Loader2
 } from 'lucide-react';
 
 // 內建的官方熱門活動範本包
@@ -83,6 +86,43 @@ export default function AdminConsole({ events, onUpdateEvents }) {
   const [activeTab, setActiveTab] = useState('import'); // 'import' | 'list'
   const [jsonInput, setJsonInput] = useState('');
   const [importNotice, setImportNotice] = useState(null); // { type: 'success' | 'error', message: string, count?: number }
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncLimit, setSyncLimit] = useState(80);
+  const [syncNotice, setSyncNotice] = useState(null);
+
+  // 一鍵從文化部抓取全台活動
+  const handleSyncTaiwanEvents = async () => {
+    setIsSyncing(true);
+    setSyncNotice(null);
+    try {
+      const res = await syncTaiwanEvents(syncLimit);
+      if (res.success && Array.isArray(res.events)) {
+        const syncIdSet = new Set(res.events.map(e => e.id));
+        // 替換已存在的同 ID 活動為最新乾淨版本（清空預設心聲），其餘手動建立的活動保留
+        const remainingEvents = events.filter(e => !syncIdSet.has(e.id));
+        const updatedEvents = [...res.events, ...remainingEvents];
+        onUpdateEvents(updatedEvents);
+        setSyncNotice({
+          type: 'success',
+          source: res.source === 'postgres' ? 'PostgreSQL' : '文化部 iCulture API (直連備援)',
+          message: `🎉 成功同步 ${res.count} 筆全台活動（已全面清空預設心聲，保留純粹風場氣流）！`,
+          count: res.count
+        });
+      } else {
+        setSyncNotice({
+          type: 'error',
+          message: '同步未回傳資料，請確認網路連線或稍後再試。'
+        });
+      }
+    } catch (err) {
+      setSyncNotice({
+        type: 'error',
+        message: `同步失敗: ${err.message}`
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // 登入驗證處理
   const handleAdminLogin = async (e) => {
@@ -205,6 +245,24 @@ export default function AdminConsole({ events, onUpdateEvents }) {
     if (window.confirm('確定要重設為預設初始資料嗎？這將覆蓋現有新增的自訂活動。')) {
       onUpdateEvents(SEED_EVENTS);
       setImportNotice({ type: 'success', message: '已重置為系統預設 5 場種子活動！' });
+    }
+  };
+
+  // 一鍵重設所有活動狀態（清空預設心聲、現場集結人數全數歸零）
+  const handleClearAllMoods = () => {
+    if (window.confirm('確定要將所有活動的集結人數與預設心聲全數歸零嗎？活動座標、風暴眼與旋轉風場將完整保留，純粹由現場真實使用者實際打卡參與。')) {
+      const updated = events.map(e => ({
+        ...e,
+        moodParticles: [],
+        participantsCount: 0,
+        arrivalStats: { departed: 0, onTheWay: 0, arrived: 0 }
+      }));
+      onUpdateEvents(updated);
+      setSyncNotice({
+        type: 'success',
+        message: '✨ 已成功將所有活動狀態歸零！現場集結人數與小心聲均重置為 0，等待真實使用者到場打卡。'
+      });
+      alert('已將所有活動人數與心聲全數歸零！目前為乾淨初始狀態。');
     }
   };
 
@@ -499,14 +557,161 @@ export default function AdminConsole({ events, onUpdateEvents }) {
 
         {/* 分頁 1: 批次匯入 */}
         {activeTab === 'import' && (
-          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* 全台開放資料即時抓取同步卡片 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%)',
+                border: '1px solid rgba(0, 240, 255, 0.3)',
+                borderRadius: '16px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 8px 32px rgba(0, 240, 255, 0.05)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #00f0ff 0%, #3b82f6 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)'
+                    }}
+                  >
+                    <Globe size={24} color="#090d16" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>全台活動即時自動抓取 (Taiwan Open Data)</span>
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(0, 240, 255, 0.2)', color: 'var(--accent-cyan)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                        文化部官方 API
+                      </span>
+                    </h3>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                      自動連線文化部藝文資料庫，即時抓取涵蓋台北、新北、台中、高雄、台南等全台展演與節慶，自動對齊經緯度、計算氣旋等級與動態小心聲。
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>抓取筆數:</span>
+                    <select
+                      value={syncLimit}
+                      onChange={e => setSyncLimit(Number(e.target.value))}
+                      disabled={isSyncing}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value={30}>30 筆精華</option>
+                      <option value={60}>60 筆熱門</option>
+                      <option value={100}>100 筆全台</option>
+                      <option value={200}>200 筆大型庫</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSyncTaiwanEvents}
+                    disabled={isSyncing}
+                    style={{
+                      padding: '10px 18px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      borderRadius: '10px',
+                      background: isSyncing
+                        ? 'rgba(100, 116, 139, 0.5)'
+                        : 'linear-gradient(135deg, #00f0ff 0%, #3b82f6 100%)',
+                      color: '#090d16',
+                      border: 'none',
+                      cursor: isSyncing ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: isSyncing ? 'none' : '0 0 20px rgba(0, 240, 255, 0.4)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Loader2 size={16} className="spin" />
+                        <span>抓取並清洗資料中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={16} />
+                        <span>一鍵抓取全台活動並匯入</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* 同步結果反饋訊息 */}
+              {syncNotice && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: syncNotice.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    border: `1px solid ${syncNotice.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                    color: syncNotice.type === 'success' ? '#34d399' : '#f87171'
+                  }}
+                >
+                  {syncNotice.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{syncNotice.message}</div>
+                    {syncNotice.source && (
+                      <div style={{ fontSize: '11px', opacity: 0.85, marginTop: '2px' }}>
+                        資料來源管道：{syncNotice.source}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('list')}
+                    style={{
+                      background: 'rgba(255,255,255,0.1)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '11px',
+                      padding: '4px 10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    檢視地圖與清單 ({events.length}) →
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#fff', margin: 0 }}>
-                  貼上或上傳活動 JSON 資料
+                  貼上或上傳自訂活動 JSON 資料
                 </h2>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  系統會自動驗證經緯度、補全小心聲旋轉粒子，並計算颱風強度分級。
+                  手動匯入其他外部來源（支援自訂 JSON 規格，系統將自動補齊颱風分級與小心聲粒子）。
                 </span>
               </div>
 
@@ -670,6 +875,27 @@ export default function AdminConsole({ events, onUpdateEvents }) {
                 >
                   <Download size={14} />
                   <span>匯出全站 JSON</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllMoods}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    color: '#fbbf24',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="將所有活動的集結人數與留言清空歸零，純粹保留旋轉風場"
+                >
+                  <Sparkles size={14} />
+                  <span>清空心聲與集結人數 (全數歸零)</span>
                 </button>
 
                 <button

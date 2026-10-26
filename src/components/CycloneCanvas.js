@@ -68,27 +68,33 @@ export class CycloneEngine {
   }
 
   handleCoordClick(x, y) {
-    let clickedId = this.hoveredEventId;
-    if (!clickedId && this.getScreenCoords) {
+    let closestEvent = null;
+    let minDistance = Infinity;
+
+    if (this.getScreenCoords) {
       for (const evt of this.events) {
         const pt = this.getScreenCoords(evt.coordinates[0], evt.coordinates[1]);
         if (!pt) continue;
         const levelConfig = STORM_LEVELS[evt.stormLevel] || STORM_LEVELS.mild;
         const dx = x - pt.x;
         const dy = y - pt.y;
-        if (Math.sqrt(dx * dx + dy * dy) <= levelConfig.radius + 35) {
-          clickedId = evt.id;
-          break;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const hitRadius = Math.max(levelConfig.radius + 35, 45);
+
+        if (dist <= hitRadius && dist < minDistance) {
+          minDistance = dist;
+          closestEvent = evt;
         }
       }
     }
 
-    if (clickedId && this.options.onSelectEvent) {
-      const target = this.events.find(ev => ev.id === clickedId);
-      if (target) {
-        this.options.onSelectEvent(target);
-        return true;
-      }
+    if (!closestEvent && this.hoveredEventId) {
+      closestEvent = this.events.find(ev => ev.id === this.hoveredEventId) || null;
+    }
+
+    if (closestEvent && this.options.onSelectEvent) {
+      this.options.onSelectEvent(closestEvent);
+      return true;
     }
     return false;
   }
@@ -286,8 +292,8 @@ export class CycloneEngine {
 
     // 2. 氣旋漩渦風壁 (Cyclone Spiral Arm)
     ctx.strokeStyle = color;
-    ctx.lineWidth = isHovered ? 2.5 : 1.5;
-    ctx.globalAlpha = isHovered ? 0.7 : 0.45;
+    ctx.lineWidth = isHovered ? 2.8 : 1.8;
+    ctx.globalAlpha = isHovered ? 0.85 : 0.65;
 
     ctx.beginPath();
     for (let a = 0; a < Math.PI * 4; a += 0.15) {
@@ -305,7 +311,7 @@ export class CycloneEngine {
     const eyeGrad = ctx.createRadialGradient(x, y, 0, x, y, 16);
     eyeGrad.addColorStop(0, '#ffffff');
     eyeGrad.addColorStop(0.4, color);
-    eyeGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
+    eyeGrad.addColorStop(1, 'rgba(0,0,0,0.85)');
 
     ctx.fillStyle = eyeGrad;
     ctx.beginPath();
@@ -315,7 +321,9 @@ export class CycloneEngine {
     // 選中狀態時的脈衝標記
     if (isSelected || isHovered) {
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 6;
       ctx.beginPath();
       ctx.arc(x, y, 16 + Math.sin(this.time * 0.1) * 3, 0, Math.PI * 2);
       ctx.stroke();
@@ -323,8 +331,10 @@ export class CycloneEngine {
 
     // 官方活動特殊皇冠/認證標記
     if (evt.sourceType === 'official') {
-      ctx.font = '10px "Inter", sans-serif';
-      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 11px "Inter", sans-serif';
+      ctx.fillStyle = '#f59e0b';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = 4;
       ctx.textAlign = 'center';
       ctx.fillText('★ 官方', x, y - 18);
     }
